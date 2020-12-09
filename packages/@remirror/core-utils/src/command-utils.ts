@@ -1,4 +1,4 @@
-import { invariant, isNumber, isString, object } from '@remirror/core-helpers';
+import { assertGet, invariant, isNumber, isString, object } from '@remirror/core-helpers';
 import type {
   AttributesParameter,
   CommandFunction,
@@ -20,7 +20,7 @@ import { findWrapping, liftTarget } from '@remirror/pm/transform';
 import { getMarkRange, isMarkType, isNodeType } from './core-utils';
 import { isNodeActive, isSelectionEmpty } from './prosemirror-utils';
 
-interface UpdateMarkParameter extends Partial<RangeParameter>, Partial<AttributesParameter> {
+export interface UpdateMarkParameter extends Partial<RangeParameter>, Partial<AttributesParameter> {
   /**
    * The text to append.
    *
@@ -100,7 +100,7 @@ export function wrapIn(
 ): CommandFunction {
   return function (parameter) {
     const { tr, dispatch, state } = parameter;
-    const nodeType = isString(type) ? state.schema.nodes[type] : type;
+    const nodeType = isString(type) ? assertGet(state.schema.nodes, type) : type;
     const { from, to } = range ?? tr.selection;
     const $from = tr.doc.resolve(from);
     const $to = tr.doc.resolve(to);
@@ -131,7 +131,7 @@ export function toggleWrap(
 ): CommandFunction {
   return (parameter) => {
     const { tr, state } = parameter;
-    const type = isString(nodeType) ? state.schema.nodes[nodeType] : nodeType;
+    const type = isString(nodeType) ? assertGet(state.schema.nodes, nodeType) : nodeType;
     const isActive = isNodeActive({ state: tr, type });
 
     if (isActive) {
@@ -155,7 +155,8 @@ export function setBlockType(
 ): CommandFunction {
   return function (parameter) {
     const { tr, dispatch, state } = parameter;
-    const type = isString(nodeType) ? state.schema.nodes[nodeType] : nodeType;
+    const type = isString(nodeType) ? assertGet(state.schema.nodes, nodeType) : nodeType;
+
     const { from, to } = range ?? tr.selection;
     let applicable = false;
 
@@ -192,11 +193,11 @@ export function setBlockType(
   };
 }
 
-interface ToggleBlockItemParameter extends NodeTypeParameter, Partial<AttributesParameter> {
+export interface ToggleBlockItemParameter extends NodeTypeParameter, Partial<AttributesParameter> {
   /**
    * The type to toggle back to. Usually this is the paragraph node type.
    */
-  toggleType: NodeType;
+  toggleType: NodeType | string;
 }
 
 /**
@@ -218,7 +219,9 @@ export function toggleBlockItem(toggleParameter: ToggleBlockItemParameter): Comm
   };
 }
 
-interface ReplaceTextParameter extends Partial<RangeParameter>, Partial<AttributesParameter> {
+export interface ReplaceTextParameter
+  extends Partial<RangeParameter>,
+    Partial<AttributesParameter> {
   /**
    * The text to append.
    *
@@ -251,7 +254,7 @@ interface ReplaceTextParameter extends Partial<RangeParameter>, Partial<Attribut
 export function isChrome(minVersion = 0): boolean {
   const parsedAgent = navigator.userAgent.match(/Chrom(e|ium)\/(\d+)\./);
 
-  return parsedAgent ? Number.parseInt(parsedAgent[2], 10) >= minVersion : false;
+  return parsedAgent ? Number.parseInt(assertGet(parsedAgent, 2), 10) >= minVersion : false;
 }
 
 /**
@@ -343,7 +346,7 @@ export function replaceText(parameter: ReplaceTextParameter): CommandFunction {
   };
 }
 
-interface RemoveMarkParameter extends MarkTypeParameter, Partial<RangeParameter<'to'>> {
+export interface RemoveMarkParameter extends MarkTypeParameter, Partial<RangeParameter<'to'>> {
   /**
    * Whether to expand empty selections to the current mark range
    *

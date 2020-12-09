@@ -1,9 +1,9 @@
 import {
   AddCustomHandler,
-  CreatePluginReturn,
+  CreateExtensionPlugin,
   CustomHandler,
   debounce,
-  extensionDecorator,
+  extension,
   isString,
   PlainExtension,
   StateUpdateLifecycleParameter,
@@ -49,7 +49,7 @@ interface TriggerUpdateParameter {
  *
  * For example, you can track the cursor or all visible paragraph nodes.
  */
-@extensionDecorator<PositionerOptions>({
+@extension<PositionerOptions>({
   defaultOptions: { scrollDebounce: 50 },
   customHandlerKeys: ['positioner'],
   staticKeys: ['scrollDebounce'],
@@ -96,7 +96,7 @@ export class PositionerExtension extends PlainExtension<PositionerOptions> {
     this.positioner(parameter);
   }
 
-  createPlugin(): CreatePluginReturn {
+  createPlugin(): CreateExtensionPlugin {
     return {
       props: {
         handleDOMEvents: {

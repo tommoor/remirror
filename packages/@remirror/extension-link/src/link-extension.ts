@@ -1,9 +1,9 @@
 import {
   ApplySchemaAttributes,
   CommandFunction,
-  CreatePluginReturn,
+  CreateExtensionPlugin,
   EditorState,
-  extensionDecorator,
+  extension,
   ExtensionPriority,
   ExtensionTag,
   FromToParameter,
@@ -22,18 +22,17 @@ import {
   MarkAttributes,
   MarkExtension,
   MarkExtensionSpec,
-  markPasteRule,
   omitExtraAttributes,
   OnSetOptionsParameter,
   preserveSelection,
   ProsemirrorNode,
-  ProsemirrorPlugin,
   range as numberRange,
   removeMark,
   Static,
   updateMark,
 } from '@remirror/core';
 import type { CreateEventHandlers } from '@remirror/extension-events';
+import { MarkPasteRule } from '@remirror/pm/paste-rules';
 import { TextSelection } from '@remirror/pm/state';
 import { isInvalidSplitReason, isRemovedReason, Suggester } from '@remirror/pm/suggest';
 
@@ -119,7 +118,7 @@ export type LinkAttributes = MarkAttributes<{
   auto?: boolean;
 }>;
 
-@extensionDecorator<LinkOptions>({
+@extension<LinkOptions>({
   defaultOptions: {
     autoLink: false,
     defaultProtocol: '',
@@ -136,7 +135,9 @@ export class LinkExtension extends MarkExtension<LinkOptions> {
     return 'link' as const;
   }
 
-  readonly tags = [ExtensionTag.Link];
+  createTags() {
+    return [ExtensionTag.Link];
+  }
 
   createMarkSpec(extra: ApplySchemaAttributes): MarkExtensionSpec {
     const AUTO_ATTRIBUTE = 'data-link-auto';
@@ -177,8 +178,10 @@ export class LinkExtension extends MarkExtension<LinkOptions> {
 
   onSetOptions(options: OnSetOptionsParameter<LinkOptions>): void {
     if (options.changes.autoLink.changed) {
-      if (options.changes.autoLink.value === true) {
-        this.store.addSuggester(this.createSuggesters()[0]);
+      const [newSuggester] = this.createSuggesters();
+
+      if (options.changes.autoLink.value === true && newSuggester) {
+        this.store.addSuggester(newSuggester);
       }
 
       if (options.changes.autoLink.value === false) {
@@ -256,21 +259,25 @@ export class LinkExtension extends MarkExtension<LinkOptions> {
   /**
    * Create the paste rules that can transform a pasted link in the document.
    */
-  createPasteRules(): ProsemirrorPlugin[] {
+  createPasteRules(): MarkPasteRule[] {
     if (this.options.autoLink) {
       return [];
     }
 
     return [
-      markPasteRule({
+      {
+        type: 'mark',
         regexp: /https?:\/\/(www\.)?[\w#%+.:=@~-]{2,256}\.[a-z]{2,6}\b([\w#%&+./:=?@~-]*)/gi,
-        type: this.type,
+        markType: this.type,
         getAttributes: (url) => ({ href: getMatchString(url), auto: true }),
-      }),
+        // Give this a low priority so that it can be by embedders which respond
+        // to url regex.
+        priority: ExtensionPriority.Lowest,
+      },
     ];
   }
 
-  createSuggesters(): Suggester[] {
+  createSuggesters(): [Suggester] | [] {
     if (!this.options.autoLink) {
       return [];
     }
@@ -518,7 +525,7 @@ export class LinkExtension extends MarkExtension<LinkOptions> {
    * TODO extract this into the events extension and move that extension into
    * core.
    */
-  createPlugin(): CreatePluginReturn {
+  createPlugin(): CreateExtensionPlugin {
     return {
       props: {
         handleClick: (view, pos) => {

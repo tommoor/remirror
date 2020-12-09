@@ -71,7 +71,7 @@ export interface UsePositionerReturn extends Partial<UseMultiPositionerReturn> {
  * is useful for tracking the positions of multiple items in the editor.
  *
  * ```ts
- * import { Positioner } from 'remirror/extension/positioner
+ * import { Positioner } from 'remirror/extensions
  * import { useMultiPositioner } from 'remirror/react';
  *
  * const positioner = Positioner.create({

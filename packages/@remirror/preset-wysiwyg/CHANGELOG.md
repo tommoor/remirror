@@ -555,8 +555,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.39
   - @remirror/extension-underline@1.0.0-next.39
   - @remirror/preset-core@1.0.0-next.39
-  - @remirror/preset-embed@1.0.0-next.39
-  - @remirror/preset-list@1.0.0-next.39
+  - @remirror/extension-embed@1.0.0-next.39
+  - @remirror/extension-list@1.0.0-next.39
   - @remirror/preset-table@1.0.0-next.39
 
 ## 1.0.0-next.38
@@ -587,8 +587,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.38
   - @remirror/extension-underline@1.0.0-next.38
   - @remirror/preset-core@1.0.0-next.38
-  - @remirror/preset-embed@1.0.0-next.38
-  - @remirror/preset-list@1.0.0-next.38
+  - @remirror/extension-embed@1.0.0-next.38
+  - @remirror/extension-list@1.0.0-next.38
   - @remirror/preset-table@1.0.0-next.38
 
 ## 1.0.0-next.37
@@ -617,8 +617,8 @@
   - @remirror/extension-strike@1.0.0-next.37
   - @remirror/extension-trailing-node@1.0.0-next.37
   - @remirror/extension-underline@1.0.0-next.37
-  - @remirror/preset-embed@1.0.0-next.37
-  - @remirror/preset-list@1.0.0-next.37
+  - @remirror/extension-embed@1.0.0-next.37
+  - @remirror/extension-list@1.0.0-next.37
   - @remirror/preset-table@1.0.0-next.37
   - @remirror/pm@1.0.0-next.37
   - @remirror/preset-core@1.0.0-next.37
@@ -663,8 +663,8 @@
   - @remirror/extension-underline@1.0.0-next.35
   - @remirror/pm@1.0.0-next.35
   - @remirror/preset-core@1.0.0-next.35
-  - @remirror/preset-embed@1.0.0-next.35
-  - @remirror/preset-list@1.0.0-next.35
+  - @remirror/extension-embed@1.0.0-next.35
+  - @remirror/extension-list@1.0.0-next.35
 
 ## 1.0.0-next.34
 
@@ -693,8 +693,8 @@
   - @remirror/extension-strike@1.0.0-next.34
   - @remirror/extension-trailing-node@1.0.0-next.34
   - @remirror/extension-underline@1.0.0-next.34
-  - @remirror/preset-embed@1.0.0-next.34
-  - @remirror/preset-list@1.0.0-next.34
+  - @remirror/extension-embed@1.0.0-next.34
+  - @remirror/extension-list@1.0.0-next.34
   - @remirror/preset-table@1.0.0-next.34
   - @remirror/pm@1.0.0-next.34
 
@@ -737,8 +737,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.33
   - @remirror/extension-underline@1.0.0-next.33
   - @remirror/preset-core@1.0.0-next.33
-  - @remirror/preset-embed@1.0.0-next.33
-  - @remirror/preset-list@1.0.0-next.33
+  - @remirror/extension-embed@1.0.0-next.33
+  - @remirror/extension-list@1.0.0-next.33
 
 ## 1.0.0-next.32
 
@@ -767,8 +767,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.32
   - @remirror/extension-underline@1.0.0-next.32
   - @remirror/preset-core@1.0.0-next.32
-  - @remirror/preset-embed@1.0.0-next.32
-  - @remirror/preset-list@1.0.0-next.32
+  - @remirror/extension-embed@1.0.0-next.32
+  - @remirror/extension-list@1.0.0-next.32
   - @remirror/preset-table@1.0.0-next.32
   - @remirror/pm@1.0.0-next.32
 
@@ -799,8 +799,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.31
   - @remirror/extension-underline@1.0.0-next.31
   - @remirror/preset-core@1.0.0-next.31
-  - @remirror/preset-embed@1.0.0-next.31
-  - @remirror/preset-list@1.0.0-next.31
+  - @remirror/extension-embed@1.0.0-next.31
+  - @remirror/extension-list@1.0.0-next.31
   - @remirror/preset-table@1.0.0-next.31
 
 ## 1.0.0-next.29
@@ -830,8 +830,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.29
   - @remirror/extension-underline@1.0.0-next.29
   - @remirror/preset-core@1.0.0-next.29
-  - @remirror/preset-embed@1.0.0-next.29
-  - @remirror/preset-list@1.0.0-next.29
+  - @remirror/extension-embed@1.0.0-next.29
+  - @remirror/extension-list@1.0.0-next.29
   - @remirror/preset-table@1.0.0-next.29
 
 ## 1.0.0-next.28
@@ -846,7 +846,7 @@
   - @remirror/extension-gap-cursor@1.0.0-next.28
   - @remirror/extension-search@1.0.0-next.28
   - @remirror/pm@1.0.0-next.28
-  - @remirror/preset-embed@1.0.0-next.28
+  - @remirror/extension-embed@1.0.0-next.28
   - @remirror/preset-table@1.0.0-next.28
   - @remirror/extension-bidi@1.0.0-next.28
   - @remirror/extension-bold@1.0.0-next.28
@@ -864,7 +864,7 @@
   - @remirror/extension-trailing-node@1.0.0-next.28
   - @remirror/extension-underline@1.0.0-next.28
   - @remirror/preset-core@1.0.0-next.28
-  - @remirror/preset-list@1.0.0-next.28
+  - @remirror/extension-list@1.0.0-next.28
 
 ## 1.0.0-next.27
 
@@ -895,8 +895,8 @@
   - @remirror/extension-strike@1.0.0-next.26
   - @remirror/extension-trailing-node@1.0.0-next.26
   - @remirror/extension-underline@1.0.0-next.26
-  - @remirror/preset-embed@1.0.0-next.26
-  - @remirror/preset-list@1.0.0-next.26
+  - @remirror/extension-embed@1.0.0-next.26
+  - @remirror/extension-list@1.0.0-next.26
   - @remirror/preset-table@1.0.0-next.26
   - @remirror/extension-bidi@1.0.0-next.26
   - @remirror/extension-drop-cursor@1.0.0-next.26
@@ -935,8 +935,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.25
   - @remirror/extension-underline@1.0.0-next.25
   - @remirror/preset-core@1.0.0-next.25
-  - @remirror/preset-embed@1.0.0-next.25
-  - @remirror/preset-list@1.0.0-next.25
+  - @remirror/extension-embed@1.0.0-next.25
+  - @remirror/extension-list@1.0.0-next.25
   - @remirror/preset-table@1.0.0-next.25
 
 ## 1.0.0-next.24
@@ -966,8 +966,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.24
   - @remirror/extension-underline@1.0.0-next.24
   - @remirror/preset-core@1.0.0-next.24
-  - @remirror/preset-embed@1.0.0-next.24
-  - @remirror/preset-list@1.0.0-next.24
+  - @remirror/extension-embed@1.0.0-next.24
+  - @remirror/extension-list@1.0.0-next.24
   - @remirror/preset-table@1.0.0-next.24
 
 ## 1.0.0-next.22
@@ -1007,8 +1007,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.22
   - @remirror/extension-underline@1.0.0-next.22
   - @remirror/preset-core@1.0.0-next.22
-  - @remirror/preset-embed@1.0.0-next.22
-  - @remirror/preset-list@1.0.0-next.22
+  - @remirror/extension-embed@1.0.0-next.22
+  - @remirror/extension-list@1.0.0-next.22
   - @remirror/preset-table@1.0.0-next.22
   - @remirror/pm@1.0.0-next.22
 
@@ -1042,8 +1042,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.21
   - @remirror/extension-underline@1.0.0-next.21
   - @remirror/preset-core@1.0.0-next.21
-  - @remirror/preset-embed@1.0.0-next.21
-  - @remirror/preset-list@1.0.0-next.21
+  - @remirror/extension-embed@1.0.0-next.21
+  - @remirror/extension-list@1.0.0-next.21
   - @remirror/preset-table@1.0.0-next.21
   - @remirror/pm@1.0.0-next.21
 
@@ -1076,8 +1076,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.20
   - @remirror/extension-underline@1.0.0-next.20
   - @remirror/preset-core@1.0.0-next.20
-  - @remirror/preset-embed@1.0.0-next.20
-  - @remirror/preset-list@1.0.0-next.20
+  - @remirror/extension-embed@1.0.0-next.20
+  - @remirror/extension-list@1.0.0-next.20
   - @remirror/preset-table@1.0.0-next.20
 
 ## 1.0.0-next.17
@@ -1107,8 +1107,8 @@
   - @remirror/extension-strike@1.0.0-next.17
   - @remirror/extension-trailing-node@1.0.0-next.17
   - @remirror/extension-underline@1.0.0-next.17
-  - @remirror/preset-embed@1.0.0-next.17
-  - @remirror/preset-list@1.0.0-next.17
+  - @remirror/extension-embed@1.0.0-next.17
+  - @remirror/extension-list@1.0.0-next.17
   - @remirror/preset-table@1.0.0-next.17
 
 ## 1.0.0-next.16
@@ -1173,8 +1173,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.16
   - @remirror/extension-underline@1.0.0-next.16
   - @remirror/pm@1.0.0-next.16
-  - @remirror/preset-embed@1.0.0-next.16
-  - @remirror/preset-list@1.0.0-next.16
+  - @remirror/extension-embed@1.0.0-next.16
+  - @remirror/extension-list@1.0.0-next.16
   - @remirror/preset-table@1.0.0-next.16
 
 ## 1.0.0-next.15
@@ -1212,8 +1212,8 @@
   - @remirror/extension-link@1.0.0-next.15
   - @remirror/extension-search@1.0.0-next.15
   - @remirror/extension-trailing-node@1.0.0-next.15
-  - @remirror/preset-embed@1.0.0-next.15
-  - @remirror/preset-list@1.0.0-next.15
+  - @remirror/extension-embed@1.0.0-next.15
+  - @remirror/extension-list@1.0.0-next.15
   - @remirror/preset-table@1.0.0-next.15
 
 ## 1.0.0-next.13
@@ -1246,7 +1246,7 @@
   - @remirror/extension-search@1.0.0-next.13
   - @remirror/extension-strike@1.0.0-next.13
   - @remirror/extension-underline@1.0.0-next.13
-  - @remirror/preset-list@1.0.0-next.13
+  - @remirror/extension-list@1.0.0-next.13
   - @remirror/extension-bidi@1.0.0-next.13
   - @remirror/extension-drop-cursor@1.0.0-next.13
   - @remirror/extension-epic-mode@1.0.0-next.13
@@ -1254,7 +1254,7 @@
   - @remirror/extension-image@1.0.0-next.13
   - @remirror/extension-trailing-node@1.0.0-next.13
   - @remirror/preset-core@1.0.0-next.13
-  - @remirror/preset-embed@1.0.0-next.13
+  - @remirror/extension-embed@1.0.0-next.13
   - @remirror/preset-table@1.0.0-next.13
 
 ## 1.0.0-next.12
@@ -1286,8 +1286,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.12
   - @remirror/extension-underline@1.0.0-next.12
   - @remirror/preset-core@1.0.0-next.12
-  - @remirror/preset-embed@1.0.0-next.12
-  - @remirror/preset-list@1.0.0-next.12
+  - @remirror/extension-embed@1.0.0-next.12
+  - @remirror/extension-list@1.0.0-next.12
   - @remirror/preset-table@1.0.0-next.12
 
 ## 1.0.0-next.11
@@ -1315,8 +1315,8 @@
   - @remirror/extension-strike@1.0.0-next.11
   - @remirror/extension-trailing-node@1.0.0-next.11
   - @remirror/extension-underline@1.0.0-next.11
-  - @remirror/preset-embed@1.0.0-next.11
-  - @remirror/preset-list@1.0.0-next.11
+  - @remirror/extension-embed@1.0.0-next.11
+  - @remirror/extension-list@1.0.0-next.11
   - @remirror/preset-table@1.0.0-next.11
   - @remirror/extension-hard-break@1.0.0-next.11
   - @remirror/preset-core@1.0.0-next.11
@@ -1350,8 +1350,8 @@
   - @remirror/extension-strike@1.0.0-next.10
   - @remirror/extension-trailing-node@1.0.0-next.10
   - @remirror/extension-underline@1.0.0-next.10
-  - @remirror/preset-embed@1.0.0-next.10
-  - @remirror/preset-list@1.0.0-next.10
+  - @remirror/extension-embed@1.0.0-next.10
+  - @remirror/extension-list@1.0.0-next.10
   - @remirror/preset-table@1.0.0-next.10
 
 ## 1.0.0-next.9
@@ -1381,8 +1381,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.9
   - @remirror/extension-underline@1.0.0-next.9
   - @remirror/preset-core@1.0.0-next.9
-  - @remirror/preset-embed@1.0.0-next.9
-  - @remirror/preset-list@1.0.0-next.9
+  - @remirror/extension-embed@1.0.0-next.9
+  - @remirror/extension-list@1.0.0-next.9
   - @remirror/preset-table@1.0.0-next.9
 
 ## 1.0.0-next.4
@@ -1418,8 +1418,8 @@
   - @remirror/extension-underline@1.0.0-next.4
   - @remirror/pm@1.0.0-next.4
   - @remirror/preset-core@1.0.0-next.4
-  - @remirror/preset-embed@1.0.0-next.4
-  - @remirror/preset-list@1.0.0-next.4
+  - @remirror/extension-embed@1.0.0-next.4
+  - @remirror/extension-list@1.0.0-next.4
 
 ## 1.0.0-next.3
 
@@ -1449,8 +1449,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.3
   - @remirror/extension-underline@1.0.0-next.3
   - @remirror/preset-core@1.0.0-next.3
-  - @remirror/preset-embed@1.0.0-next.3
-  - @remirror/preset-list@1.0.0-next.3
+  - @remirror/extension-embed@1.0.0-next.3
+  - @remirror/extension-list@1.0.0-next.3
   - @remirror/preset-table@1.0.0-next.3
 
 ## 1.0.0-next.2
@@ -1480,8 +1480,8 @@
   - @remirror/extension-trailing-node@1.0.0-next.2
   - @remirror/extension-underline@1.0.0-next.2
   - @remirror/preset-core@1.0.0-next.2
-  - @remirror/preset-embed@1.0.0-next.2
-  - @remirror/preset-list@1.0.0-next.2
+  - @remirror/extension-embed@1.0.0-next.2
+  - @remirror/extension-list@1.0.0-next.2
   - @remirror/preset-table@1.0.0-next.2
 
 ## 1.0.0-next.1
@@ -1513,8 +1513,8 @@
   - @remirror/extension-underline@1.0.0-next.1
   - @remirror/pm@1.0.0-next.1
   - @remirror/preset-core@1.0.0-next.1
-  - @remirror/preset-embed@1.0.0-next.1
-  - @remirror/preset-list@1.0.0-next.1
+  - @remirror/extension-embed@1.0.0-next.1
+  - @remirror/extension-list@1.0.0-next.1
   - @remirror/preset-table@1.0.0-next.1
 
 ## 1.0.0-next.0
@@ -1553,6 +1553,6 @@
   - @remirror/extension-underline@1.0.0-next.0
   - @remirror/pm@1.0.0-next.0
   - @remirror/preset-core@1.0.0-next.0
-  - @remirror/preset-embed@1.0.0-next.0
-  - @remirror/preset-list@1.0.0-next.0
+  - @remirror/extension-embed@1.0.0-next.0
+  - @remirror/extension-list@1.0.0-next.0
   - @remirror/preset-table@1.0.0-next.0

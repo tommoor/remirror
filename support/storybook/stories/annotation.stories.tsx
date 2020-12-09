@@ -1,17 +1,13 @@
-import React, { FC, useEffect, useMemo } from 'react';
-import {
-  AnnotationExtension,
-  createCenteredAnnotationPositioner,
-} from 'remirror/extension/annotation';
-import { RemirrorProvider, useManager, useRemirror } from 'remirror/react';
-import { usePositioner } from 'remirror/react/hooks';
+import { FC, useEffect, useMemo } from 'react';
+import { AnnotationExtension, createCenteredAnnotationPositioner } from 'remirror/extensions';
+import { Remirror, usePositioner, useRemirror, useRemirrorContext } from 'remirror/react';
 
 export default { title: 'Editor with annotation' };
 
 const SAMPLE_TEXT = 'This is a sample text';
 
 const Popup: FC = () => {
-  const { helpers, getState } = useRemirror({ autoUpdate: true });
+  const { helpers, getState } = useRemirrorContext({ autoUpdate: true });
 
   const memoizedPositioner = useMemo(
     () => createCenteredAnnotationPositioner(helpers.getAnnotationsAt),
@@ -44,7 +40,7 @@ const Popup: FC = () => {
 };
 
 const SmallEditor: FC = () => {
-  const { getRootProps, setContent, commands } = useRemirror();
+  const { getRootProps, setContent, commands } = useRemirrorContext();
 
   useEffect(() => {
     setContent({
@@ -89,11 +85,11 @@ const SmallEditor: FC = () => {
 };
 
 export const Basic = () => {
-  const extensionManager = useManager([new AnnotationExtension()]);
+  const { manager } = useRemirror({ extensions: () => [new AnnotationExtension()] });
 
   return (
-    <RemirrorProvider manager={extensionManager}>
+    <Remirror manager={manager}>
       <SmallEditor />
-    </RemirrorProvider>
+    </Remirror>
   );
 };

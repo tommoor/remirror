@@ -2,7 +2,7 @@ import {
   ApplySchemaAttributes,
   CommandFunction,
   ErrorConstant,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   InputRule,
   invariant,
@@ -29,7 +29,7 @@ export interface HorizontalRuleOptions {
 /**
  * Adds a horizontal line to the editor.
  */
-@extensionDecorator<HorizontalRuleOptions>({
+@extension<HorizontalRuleOptions>({
   defaultOptions: { insertionNode: 'paragraph' },
 })
 export class HorizontalRuleExtension extends NodeExtension<HorizontalRuleOptions> {
@@ -37,7 +37,9 @@ export class HorizontalRuleExtension extends NodeExtension<HorizontalRuleOptions
     return 'horizontalRule' as const;
   }
 
-  readonly tags = [ExtensionTag.BlockNode];
+  createTags() {
+    return [ExtensionTag.BlockNode];
+  }
 
   createNodeSpec(extra: ApplySchemaAttributes): NodeExtensionSpec {
     return {
@@ -51,13 +53,6 @@ export class HorizontalRuleExtension extends NodeExtension<HorizontalRuleOptions
     return {
       /**
        * Inserts a horizontal line into the editor.
-       *
-       * @remarks
-       *
-       * TODO: There is currently a bug in Chrome where if the editor is not
-       * focused at the point that this is called, the selection jumps to before
-       * the first insertion when you start typing. It doesn't happen in Firefox
-       * or Safari.
        */
       insertHorizontalRule: (): CommandFunction => (parameter) => {
         const { tr, dispatch } = parameter;

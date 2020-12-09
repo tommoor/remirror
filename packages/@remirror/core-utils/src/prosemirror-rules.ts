@@ -1,18 +1,14 @@
-import { findMatches, isFunction, isNullOrUndefined } from '@remirror/core-helpers';
+import { isFunction, isNullOrUndefined } from '@remirror/core-helpers';
 import type {
   EditorStateParameter,
   GetAttributesParameter,
   Mark,
   MarkTypeParameter,
   NodeTypeParameter,
-  ProsemirrorNode,
-  ProsemirrorPlugin,
   RegExpParameter,
   TransactionParameter,
 } from '@remirror/core-types';
 import { InputRule } from '@remirror/pm/inputrules';
-import { Fragment, Slice } from '@remirror/pm/model';
-import { Plugin, PluginKey } from '@remirror/pm/state';
 import { markActiveInRange } from '@remirror/pm/suggest';
 
 export interface BeforeDispatchParameter extends TransactionParameter {
@@ -39,7 +35,7 @@ export interface BaseInputRuleParameter {
      state.
    *
    * ```ts
-   * import { nodeInputRule } from 'remirror/core';
+   * import { nodeInputRule } from 'remirror';
    *
    * nodeInputRule({
    *   type,
@@ -125,61 +121,6 @@ interface MarkInputRuleParameter
    * for more context.
    */
   updateCaptured?: (captured: UpdateCaptureTextParameter) => Partial<UpdateCaptureTextParameter>;
-}
-
-/**
- * Creates a paste rule based on the provided regex for the provided mark type.
- *
- * TODO extract this into a separate package
- * - All contained in one plugin.
- * - Support for node paste rules
- * - Support for pasting different kinds of content.
- */
-export function markPasteRule(parameter: MarkInputRuleParameter): ProsemirrorPlugin {
-  const { regexp, type, getAttributes } = parameter;
-  const handler = (fragment: Fragment) => {
-    const nodes: ProsemirrorNode[] = [];
-
-    fragment.forEach((child) => {
-      if (child.isText) {
-        const text = child.text ?? '';
-        let pos = 0;
-
-        findMatches(text, regexp).forEach((match) => {
-          if (!match[1]) {
-            return;
-          }
-
-          const start = match.index;
-          const end = start + match[0].length;
-          const attributes = isFunction(getAttributes) ? getAttributes(match) : getAttributes;
-
-          if (start > 0) {
-            nodes.push(child.cut(pos, start));
-          }
-
-          nodes.push(child.cut(start, end).mark(type.create(attributes).addToSet(child.marks)));
-
-          pos = end;
-        });
-
-        if (text && pos < text.length) {
-          nodes.push(child.cut(pos));
-        }
-      } else {
-        nodes.push(child.copy(handler(child.content)));
-      }
-    });
-
-    return Fragment.fromArray(nodes);
-  };
-
-  return new Plugin({
-    key: new PluginKey('pasteRule'),
-    props: {
-      transformPasted: (slice) => new Slice(handler(slice.content), slice.openStart, slice.openEnd),
-    },
-  });
 }
 
 /**

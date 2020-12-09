@@ -1,7 +1,7 @@
 import {
   ApplySchemaAttributes,
   CommandFunction,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   InputRule,
   KeyBindings,
@@ -14,13 +14,15 @@ import { wrappingInputRule } from '@remirror/pm/inputrules';
 /**
  * Adds a blockquote to the editor.
  */
-@extensionDecorator({})
+@extension({})
 export class BlockquoteExtension extends NodeExtension {
   get name() {
     return 'blockquote' as const;
   }
 
-  readonly tags = [ExtensionTag.BlockNode];
+  createTags() {
+    return [ExtensionTag.BlockNode];
+  }
 
   createNodeSpec(extra: ApplySchemaAttributes): NodeExtensionSpec {
     return {

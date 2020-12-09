@@ -141,7 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [10.x, 12.x, 14.x]
+        node-version: [12.x, 14.x, 15.x]
       fail-fast: false
 
     steps:
@@ -206,7 +206,10 @@ jobs:
         run: pnpm build
 
       - name: check sizes
-        run: pnpm size
+        uses: andresz1/size-limit-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          skip_step: install
 
   # Run chromium e2e tests with playwright
   chromium_e2e:

@@ -7,39 +7,7 @@ import {
   strong,
 } from 'jest-prosemirror';
 
-import { markInputRule, markPasteRule, nodeInputRule, plainInputRule } from '../prosemirror-rules';
-
-describe('markPasteRule', () => {
-  it('should transform simple content', () => {
-    const plugin = markPasteRule({ regexp: /(Hello)/, type: testSchema.marks.strong });
-    createEditor(doc(p('<cursor>')), { plugins: [plugin] })
-      .paste('Hello')
-      .callback((content) => expect(content.doc).toEqualProsemirrorNode(doc(p(strong('Hello')))));
-  });
-
-  it('should transform complex content', () => {
-    const plugin = markPasteRule({ regexp: /(@[a-z]+)/, type: testSchema.marks.strong });
-    createEditor(doc(p('<cursor>')), { plugins: [plugin] })
-      .paste(doc(p('Some @test @content'), p('should @be amazing')))
-      .callback((content) => {
-        expect(content.doc).toEqualProsemirrorNode(
-          doc(
-            p('Some ', strong('@test'), ' ', strong('@content')),
-            p('should ', strong('@be'), ' amazing'),
-          ),
-        );
-      });
-  });
-
-  it('should not transform when no match found', () => {
-    const plugin = markPasteRule({ regexp: /(Hello)/, type: testSchema.marks.strong });
-    createEditor(doc(p('<cursor>')), { plugins: [plugin] })
-      .paste('Not The Word')
-      .callback((content) => {
-        expect(content.doc).toEqualProsemirrorNode(doc(p('Not The Word')));
-      });
-  });
-});
+import { markInputRule, nodeInputRule, plainInputRule } from '../prosemirror-rules';
 
 describe('markInputRule', () => {
   it('should wrap matched content with the specified mark type', () => {

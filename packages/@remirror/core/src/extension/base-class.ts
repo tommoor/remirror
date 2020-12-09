@@ -9,13 +9,10 @@ import {
   RemirrorIdentifier,
 } from '@remirror/core-constants';
 import {
-  camelCase,
   deepMerge,
   invariant,
-  isArray,
   isEmptyArray,
   isFunction,
-  isPlainObject,
   keys,
   noop,
   object,
@@ -47,12 +44,6 @@ import type {
 
 import { getChangedOptions } from '../helpers';
 import type { OnSetOptionsParameter } from '../types';
-
-interface BaseClassConstructorParameter<DefaultStaticOptions extends Shape = EmptyShape> {
-  validator: (Constructor: unknown, code: ErrorConstant) => void;
-  code: ErrorConstant;
-  defaultOptions: DefaultStaticOptions;
-}
 
 const IGNORE = '__IGNORE__';
 const GENERAL_OPTIONS = '__ALL__' as const;
@@ -92,30 +83,10 @@ export abstract class BaseClass<
   static readonly customHandlerKeys: string[] = [];
 
   /**
-   * Get the instance name of the instance from the constructor.
-   *
-   * - `'CorePreset'` => `'core'`
-   * - `'AwesomeNodeExtension'` => `'awesomeNode'`
-   *
-   * The solution was adapted from https://stackoverflow.com/a/7888303/2172153.
-   */
-  static get instanceName(): string {
-    // Make sure to camelCase the string (so that the first letter is
-    // lowercase). `'BoldExtension'` => `'boldExtension'`
-    return camelCase(
-      this.name
-        // Split by capitals `'boldExtension'` => `['bold', 'Extension']`.
-        .split(/(?=[A-Z])/)
-        // Drop the last index. `['bold', 'Extension']` => `['bold']`.
-        .slice(0, -1)
-        // Rejoin the word `['bold']` => `'bold'`.
-        .join(''),
-    );
-  }
-
-  /**
    * This is not for external use. It is purely here for TypeScript inference of
    * the generic `Options` type parameter.
+   *
+   * @internal
    */
   ['~O']: Options & DefaultStaticOptions;
 
@@ -158,14 +129,14 @@ export abstract class BaseClass<
    * - `ObjectHandlers` - Can only be set during the runtime of the extension.
    */
   get options(): GetFixed<Options> & DefaultStaticOptions {
-    return this.#options;
+    return this._options;
   }
 
   /**
    * Get the dynamic keys for this extension.
    */
   get dynamicKeys(): string[] {
-    return this.#dynamicKeys;
+    return this._dynamicKeys;
   }
 
   /**
@@ -173,47 +144,44 @@ export abstract class BaseClass<
    * default options.
    */
   get initialOptions(): GetFixed<Options> & DefaultStaticOptions {
-    return this.#initialOptions;
+    return this._initialOptions;
   }
 
   /**
    * The initial options at creation (used to reset).
    */
-  readonly #initialOptions: GetFixed<Options> & DefaultStaticOptions;
+  private readonly _initialOptions: GetFixed<Options> & DefaultStaticOptions;
 
   /**
    * All the dynamic keys supported by this extension.
    */
-  readonly #dynamicKeys: string[];
+  private readonly _dynamicKeys: string[];
 
   /**
    * Private instance of the extension options.
    */
-  #options: GetFixed<Options> & DefaultStaticOptions;
+  private _options: GetFixed<Options> & DefaultStaticOptions;
 
   /**
    * The mapped function handlers.
    */
-  #mappedHandlers: GetMappedHandler<Options>;
+  private _mappedHandlers: GetMappedHandler<Options>;
 
   constructor(
-    { validator, defaultOptions, code }: BaseClassConstructorParameter<DefaultStaticOptions>,
-    ...parameters: ConstructorParameter<Options, DefaultStaticOptions>
+    defaultOptions: DefaultStaticOptions,
+    ...[options]: ConstructorParameter<Options, DefaultStaticOptions>
   ) {
-    validator(this.constructor, code);
-
-    const [options] = parameters;
-    this.#mappedHandlers = object();
+    this._mappedHandlers = object();
     this.populateMappedHandlers();
 
-    this.#options = this.#initialOptions = deepMerge(
+    this._options = this._initialOptions = deepMerge(
       defaultOptions,
       this.constructor.defaultOptions,
       options ?? object(),
       this.createDefaultHandlerOptions(),
     );
 
-    this.#dynamicKeys = this.getDynamicKeys();
+    this._dynamicKeys = this.getDynamicKeys();
 
     // Triggers the `init` options update for this extension.
     this.init();
@@ -226,13 +194,18 @@ export abstract class BaseClass<
    *
    * @remarks
    *
-   * It should be used instead of overriding the constructor which can lead to
-   * problems.
+   * It should be used instead of overriding the constructor which is strongly
+   * advised against.
    *
-   * At this point
-   * - `this.store` will throw an error since it doesn't yet exist.
+   * There are some limitations when using this method.
+   *
+   * - Accessing `this.store` will throw an error since the manager hasn't been
+   *   created and it hasn't yet been attached to the extensions.
    * - `this.type` in `NodeExtension` and `MarkExtension` will also throw an
    *   error since the schema hasn't been created yet.
+   *
+   * You should use this to setup any instance properties with the options
+   * provided to the extension.
    */
   protected init(): void {}
 
@@ -251,7 +224,7 @@ export abstract class BaseClass<
     const dynamicKeys: string[] = [];
     const { customHandlerKeys, handlerKeys, staticKeys } = this.constructor;
 
-    for (const key of keys(this.#options)) {
+    for (const key of keys(this._options)) {
       if (
         staticKeys.includes(key) ||
         handlerKeys.includes(key) ||
@@ -277,7 +250,7 @@ export abstract class BaseClass<
     const invalid: string[] = [];
 
     for (const key of keys(update)) {
-      if (this.#dynamicKeys.includes(key)) {
+      if (this._dynamicKeys.includes(key)) {
         continue;
       }
 
@@ -314,7 +287,7 @@ export abstract class BaseClass<
       changes,
       options,
       pickChanged,
-      initialOptions: this.#initialOptions,
+      initialOptions: this._initialOptions,
     });
   }
 
@@ -327,7 +300,7 @@ export abstract class BaseClass<
     const previousOptions = this.getDynamicOptions();
     const { changes, options, pickChanged } = getChangedOptions<Options>({
       previousOptions,
-      update: this.#initialOptions,
+      update: this._initialOptions,
     });
 
     this.updateDynamicOptions(options);
@@ -339,7 +312,7 @@ export abstract class BaseClass<
       options,
       changes,
       pickChanged,
-      initialOptions: this.#initialOptions,
+      initialOptions: this._initialOptions,
     });
   }
 
@@ -372,7 +345,7 @@ export abstract class BaseClass<
    * Update the private options.
    */
   private getDynamicOptions(): GetFixedDynamic<Options> {
-    return omit(this.#options, [
+    return omit(this._options, [
       ...this.constructor.customHandlerKeys,
       ...this.constructor.handlerKeys,
     ]) as any;
@@ -382,7 +355,7 @@ export abstract class BaseClass<
    * Update the dynamic options.
    */
   private updateDynamicOptions(options: GetFixedDynamic<Options>) {
-    this.#options = { ...this.#options, ...options };
+    this._options = { ...this._options, ...options };
   }
 
   /**
@@ -390,7 +363,7 @@ export abstract class BaseClass<
    */
   private populateMappedHandlers() {
     for (const key of this.constructor.handlerKeys as HandlerKeyList<Options>) {
-      this.#mappedHandlers[key] = [];
+      this._mappedHandlers[key] = [];
     }
   }
 
@@ -402,11 +375,13 @@ export abstract class BaseClass<
 
     for (const key of this.constructor.handlerKeys as HandlerKeyList<Options>) {
       methods[key] = (...args: any[]) => {
-        let returnValue: unknown;
+        const { handlerKeyOptions } = this.constructor;
+        const reducer = handlerKeyOptions[key as string]?.reducer;
+        let returnValue: unknown = reducer?.getDefault(...args);
 
-        for (const [, handler] of this.#mappedHandlers[key]) {
-          returnValue = ((handler as unknown) as AnyFunction)(...args);
-          const { handlerKeyOptions } = this.constructor;
+        for (const [, handler] of this._mappedHandlers[key]) {
+          const value = ((handler as unknown) as AnyFunction)(...args);
+          returnValue = reducer ? reducer.accumulator(returnValue, value, ...args) : value;
 
           // Check if the method should cause an early return, based on the
           // return value.
@@ -441,19 +416,19 @@ export abstract class BaseClass<
     method: GetHandler<Options>[Key],
     priority = ExtensionPriority.Default,
   ): Dispose {
-    this.#mappedHandlers[key].push([priority, method]);
+    this._mappedHandlers[key].push([priority, method]);
     this.sortHandlers(key);
 
     // Return a method for disposing of the handler.
     return () =>
-      (this.#mappedHandlers[key] = this.#mappedHandlers[key].filter(
+      (this._mappedHandlers[key] = this._mappedHandlers[key].filter(
         ([, handler]) => handler !== method,
       ));
   }
 
   private sortHandlers<Key extends keyof GetHandler<Options>>(key: Key) {
-    this.#mappedHandlers[key] = sort(
-      this.#mappedHandlers[key],
+    this._mappedHandlers[key] = sort(
+      this._mappedHandlers[key],
       // Sort from highest binding to the lowest.
       ([a], [z]) => z - a,
     );
@@ -555,13 +530,30 @@ export type AddHandlers<Options extends ValidOptions> = (
   parameter: Partial<GetHandler<Options>>,
 ) => Dispose;
 
-export interface HandlerKeyOptions {
+export interface HandlerKeyOptions<ReturnType = any, Args extends any[] = any[]> {
   /**
    * When this value is encountered the handler will exit early.
    *
-   * Set the value to `'__IGNORE__'` to ignore it
+   * Set the value to `'__IGNORE__'` to ignore the early return value.
    */
   earlyReturnValue?: LiteralUnion<typeof IGNORE, Primitive> | ((value: unknown) => boolean);
+
+  /**
+   * Allows combining the values from the handlers together to produce a single
+   * reduced output value.
+   */
+  reducer?: {
+    /**
+     * Combine the value with the the previous value
+     */
+    accumulator: (accumulated: ReturnType, latestValue: ReturnType, ...args: Args) => ReturnType;
+
+    /**
+     * The a function that returns the default value for combined handler
+     * values. This is required for setting up a default value.
+     */
+    getDefault: (...args: Args) => ReturnType;
+  };
 }
 
 export interface BaseClass<
@@ -637,14 +629,6 @@ export interface BaseClassConstructor<
    * A list of the custom keys in the extension or preset options.
    */
   readonly customHandlerKeys: string[];
-
-  /**
-   * The instance name when instantiated.
-   *
-   * - `'CorePreset'` => `'core'`
-   * - `'AwesomeNodeExtension'` => `'awesomeNode'`
-   */
-  readonly instanceName: string;
 }
 
 export type AnyBaseClassConstructor = Replace<
@@ -664,8 +648,8 @@ export type ConstructorParameter<
   DefaultStaticOptions extends Shape
 > = IfNoRequiredProperties<
   GetStatic<Options>,
-  [(GetConstructorParameter<Options> & DefaultStaticOptions)?],
-  [GetConstructorParameter<Options> & DefaultStaticOptions]
+  [options?: GetConstructorParameter<Options> & DefaultStaticOptions],
+  [options: GetConstructorParameter<Options> & DefaultStaticOptions]
 >;
 
 /**
@@ -682,35 +666,6 @@ export type DefaultOptions<
     GetFixedDynamic<Options>,
   StringKey<GetAcceptUndefined<Options>>
 >;
-
-/**
- * Checks that the extension has a valid constructor with the `defaultOptions`
- * and `defaultProperties` defined as static properties.
- */
-export function isValidConstructor(
-  Constructor: BaseClassConstructor<any, any>,
-  code: ErrorConstant,
-): asserts Constructor {
-  invariant(isPlainObject(Constructor.defaultOptions), {
-    message: `No static 'defaultOptions' provided for '${Constructor.name}'.\n`,
-    code,
-  });
-
-  invariant(isArray(Constructor.staticKeys), {
-    message: `No static 'staticKeys' provided for '${Constructor.name}'.\n`,
-    code,
-  });
-
-  invariant(isArray(Constructor.handlerKeys), {
-    message: `No static 'handlerKeys' provided for '${Constructor.name}'.\n`,
-    code,
-  });
-
-  invariant(isArray(Constructor.customHandlerKeys), {
-    message: `No static 'customHandlerKeys' provided for '${Constructor.name}'.\n`,
-    code,
-  });
-}
 
 export interface AnyBaseClassOverrides {
   addCustomHandler: AnyFunction;

@@ -1,4 +1,4 @@
-import { entries, isFunction, isPromise } from '@remirror/core-helpers';
+import { assertGet, entries, isFunction, isPromise } from '@remirror/core-helpers';
 import type {
   AttributesParameter,
   CommandFunction,
@@ -161,13 +161,15 @@ export function insertText(text: string, options: InsertTextOptions = {}): Comma
 
     // Map the end position after inserting the text to understand what needs to
     // be wrapped with a mark.
-    const end = tr.steps[tr.steps.length - 1].getMap().map(to);
+    const end = assertGet(tr.steps, tr.steps.length - 1)
+      .getMap()
+      .map(to);
 
     // Loop through the provided marks to add the mark to the selection. This
     // uses the order of the map you created. If any marks are exclusive, they
     // will override the previous.
     for (const [markName, attributes] of entries(marks)) {
-      tr.addMark(from, end, schema.marks[markName].create(attributes));
+      tr.addMark(from, end, assertGet(schema.marks, markName).create(attributes));
     }
 
     dispatch(tr);

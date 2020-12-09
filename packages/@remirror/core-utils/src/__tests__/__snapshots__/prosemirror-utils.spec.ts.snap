@@ -25,6 +25,7 @@ Object {
   },
   "nodes": Object {
     "doc": Object {
+      "attrs": Object {},
       "content": "block+",
       "group": undefined,
     },

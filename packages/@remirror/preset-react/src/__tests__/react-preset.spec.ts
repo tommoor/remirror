@@ -1,5 +1,8 @@
-import { presetValidityTest } from 'jest-remirror';
+import { renderEditor } from 'jest-remirror';
 
-import { ReactPreset } from '..';
+import { ReactPlaceholderExtension, reactPreset } from '../..';
 
-presetValidityTest(ReactPreset);
+test('it renders with options', () => {
+  const editor = renderEditor(() => reactPreset({ placeholder: 'Hello' }));
+  expect(editor.manager.getExtension(ReactPlaceholderExtension).options.placeholder).toBe('Hello');
+});

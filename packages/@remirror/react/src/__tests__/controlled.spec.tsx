@@ -1,27 +1,26 @@
 import { RemirrorTestChain } from 'jest-remirror';
-import React, { FC, useState } from 'react';
-
+import { FC, useState } from 'react';
 import {
-  AnyCombinedUnion,
   AnyExtension,
   EditorState,
-  fromHtml,
+  GetSchema,
+  htmlToProsemirrorNode,
   PlainExtension,
   RemirrorEventListener,
-  SchemaFromCombined,
   StateUpdateLifecycleParameter,
-} from '@remirror/core';
-import { BoldExtension, ItalicExtension } from '@remirror/testing';
+} from 'remirror';
+import { BoldExtension, ItalicExtension } from 'remirror/extensions';
+
 import { act, fireEvent, render, strictRender } from '@remirror/testing/react';
 
-import { RemirrorProvider, useManager, useRemirror } from '../..';
+import { Remirror, useManager, useRemirrorContext } from '../..';
 import { createReactManager } from '../react-helpers';
 import type { ReactFrameworkOutput } from '../react-types';
 
 const label = 'Remirror editor';
 
-function create<Combined extends AnyCombinedUnion>(combined?: Combined[]) {
-  const manager = createReactManager(combined ?? []);
+function create<ExtensionUnion extends AnyExtension>(extensions?: ExtensionUnion[]) {
+  const manager = createReactManager(extensions ?? []);
   const chain = RemirrorTestChain.create(manager);
 
   return {
@@ -31,7 +30,7 @@ function create<Combined extends AnyCombinedUnion>(combined?: Combined[]) {
     p: chain.nodes.paragraph,
     props: {
       label,
-      stringHandler: fromHtml,
+      stringHandler: htmlToProsemirrorNode,
     },
   };
 }
@@ -52,18 +51,18 @@ describe('Remirror Controlled Component', () => {
 
     const value = manager.createState({
       content: '<p>This is the initial value</p>',
-      stringHandler: fromHtml,
+      stringHandler: htmlToProsemirrorNode,
     });
     const onChange = jest.fn();
 
     const { getByRole } = strictRender(
-      <RemirrorProvider
+      <Remirror
         {...props}
-        value={value}
+        state={value}
         manager={manager}
         onChange={onChange}
         autoRender='start'
-      ></RemirrorProvider>,
+      ></Remirror>,
     );
 
     expect(getByRole('textbox')).toMatchSnapshot();
@@ -77,19 +76,19 @@ describe('Remirror Controlled Component', () => {
 
     const value = manager.createState({
       content: '<p>Not terrible</p>',
-      stringHandler: fromHtml,
+      stringHandler: htmlToProsemirrorNode,
     });
     const onChange = jest.fn();
 
     strictRender(
-      <RemirrorProvider
+      <Remirror
         {...props}
         manager={manager}
         initialContent='<p>Terrible</p>'
-        value={value}
+        state={value}
         onChange={onChange}
         autoRender='start'
-      ></RemirrorProvider>,
+      ></Remirror>,
     );
 
     expect(chain.dom).toMatchSnapshot();
@@ -102,20 +101,20 @@ describe('Remirror Controlled Component', () => {
       const [value, setValue] = useState<EditorState>(
         manager.createState({
           content: '<p>some content</p>',
-          stringHandler: fromHtml,
+          stringHandler: htmlToProsemirrorNode,
         }),
       );
 
       return (
-        <RemirrorProvider
+        <Remirror
           {...props}
-          value={value}
+          state={value}
           manager={manager}
           onChange={(parameter) => {
             setValue(parameter.state);
           }}
           autoRender='start'
-        ></RemirrorProvider>
+        ></Remirror>
       );
     };
 
@@ -132,25 +131,25 @@ describe('Remirror Controlled Component', () => {
     const { manager, props, chain } = create();
 
     const Component = () => {
-      const [value, setValue] = useState<EditorState>(
+      const [state, setState] = useState<EditorState>(
         manager.createState({
           content: '<p>some content</p>',
-          stringHandler: fromHtml,
+          stringHandler: htmlToProsemirrorNode,
         }),
       );
 
       return (
-        <RemirrorProvider
+        <Remirror
           {...props}
-          value={value}
+          state={state}
           manager={manager}
           onChange={(parameter) => {
             const { createStateFromContent, getText } = parameter;
 
-            setValue(createStateFromContent(`<p>Hello</p><p>${getText()}</p>`));
+            setState(createStateFromContent(`<p>Hello</p><p>${getText()}</p>`));
           }}
           autoRender='start'
-        ></RemirrorProvider>
+        ></Remirror>
       );
     };
 
@@ -166,39 +165,41 @@ describe('Remirror Controlled Component', () => {
   it('throws when using  `setContent` updates', () => {
     const { manager, props } = create();
 
-    const value = manager.createState({
+    const state = manager.createState({
       content: '<p>some content</p>',
-      stringHandler: fromHtml,
+      stringHandler: htmlToProsemirrorNode,
     });
 
-    let context: ReactFrameworkOutput<typeof manager['~EP']>;
+    let context: ReactFrameworkOutput<typeof manager['~E']>;
 
     const GetContext = () => {
-      context = useRemirror();
+      context = useRemirrorContext();
 
       return null;
     };
 
     const Component: FC<{
-      editorState: EditorState<SchemaFromCombined<typeof manager['~EP']>>;
+      editorState: EditorState<GetSchema<typeof manager['~E']>>;
     }> = ({ editorState }) => {
       return (
-        <RemirrorProvider
+        <Remirror
           {...props}
-          value={editorState}
+          state={editorState}
           manager={manager}
           onChange={jest.fn()}
           autoRender='start'
         >
           <GetContext />
-        </RemirrorProvider>
+        </Remirror>
       );
     };
 
-    strictRender(<Component editorState={value} />);
+    strictRender(<Component editorState={state} />);
 
     expect(() => context.setContent('<p>Error</p>')).toThrowErrorMatchingSnapshot();
     expect(() => context.clearContent()).toThrowErrorMatchingSnapshot();
+    expect(() => context.setContent('<p>Cool</p>', { triggerChange: true })).not.toThrow();
+    expect(() => context.clearContent({ triggerChange: true })).not.toThrow();
   });
 
   it('throws when switching from controlled to non-controlled', () => {
@@ -206,7 +207,7 @@ describe('Remirror Controlled Component', () => {
 
     const value = manager.createState({
       content: '<p>some content</p>',
-      stringHandler: fromHtml,
+      stringHandler: htmlToProsemirrorNode,
     });
 
     const set = jest.fn();
@@ -216,9 +217,9 @@ describe('Remirror Controlled Component', () => {
       set.mockImplementation(setState);
 
       return (
-        <RemirrorProvider
+        <Remirror
           {...props}
-          value={state}
+          state={state}
           manager={manager}
           onChange={jest.fn()}
           autoRender='start'
@@ -241,7 +242,7 @@ describe('Remirror Controlled Component', () => {
 
     const value = manager.createState({
       content: '<p>some content</p>',
-      stringHandler: fromHtml,
+      stringHandler: htmlToProsemirrorNode,
     });
 
     const set = jest.fn();
@@ -251,9 +252,9 @@ describe('Remirror Controlled Component', () => {
       set.mockImplementation(setState);
 
       return (
-        <RemirrorProvider
+        <Remirror
           {...props}
-          value={state}
+          state={state}
           manager={manager}
           onChange={jest.fn()}
           autoRender='start'
@@ -288,15 +289,15 @@ describe('Remirror Controlled Component', () => {
       const [value, setValue] = useState<EditorState>(() =>
         manager.createState({
           content: doc(p('some content')),
-          stringHandler: fromHtml,
+          stringHandler: htmlToProsemirrorNode,
           selection: 'end',
         }),
       );
 
       return (
-        <RemirrorProvider
+        <Remirror
           {...props}
-          value={value}
+          state={value}
           manager={manager}
           onChange={(parameter) => {
             const { state } = parameter;
@@ -328,7 +329,7 @@ test('can run multiple commands', () => {
   const { bold, italic } = chain.marks;
 
   const InnerComponent: FC = () => {
-    const { getRootProps, commands } = useRemirror();
+    const { getRootProps, commands } = useRemirrorContext();
 
     return (
       <div>
@@ -347,14 +348,14 @@ test('can run multiple commands', () => {
     const [value, setValue] = useState<EditorState>(
       manager.createState({
         content: '',
-        stringHandler: fromHtml,
+        stringHandler: htmlToProsemirrorNode,
       }),
     );
 
     return (
-      <RemirrorProvider
+      <Remirror
         {...props}
-        value={value}
+        state={value}
         manager={manager}
         onChange={(parameter) => {
           const { state } = parameter;
@@ -362,7 +363,7 @@ test('can run multiple commands', () => {
         }}
       >
         <InnerComponent />
-      </RemirrorProvider>
+      </Remirror>
     );
   };
 
@@ -387,7 +388,7 @@ test('NOTE: this test is to show that synchronous state updates only show the mo
   const { manager, props, chain, doc, p } = create([]);
 
   const InnerComponent: FC = () => {
-    const { getRootProps, view } = useRemirror();
+    const { getRootProps, view } = useRemirrorContext();
 
     return (
       <div>
@@ -407,14 +408,14 @@ test('NOTE: this test is to show that synchronous state updates only show the mo
     const [value, setValue] = useState<EditorState>(
       manager.createState({
         content: '',
-        stringHandler: fromHtml,
+        stringHandler: htmlToProsemirrorNode,
       }),
     );
 
     return (
-      <RemirrorProvider
+      <Remirror
         {...props}
-        value={value}
+        state={value}
         manager={manager}
         onChange={(parameter) => {
           const { state } = parameter;
@@ -422,7 +423,7 @@ test('NOTE: this test is to show that synchronous state updates only show the mo
         }}
       >
         <InnerComponent />
-      </RemirrorProvider>
+      </Remirror>
     );
   };
 
@@ -445,7 +446,7 @@ test('support for rendering a nested controlled editor in strict mode', () => {
       manager.createState({
         content: '<p>test</p>',
         selection: 'all',
-        stringHandler: fromHtml,
+        stringHandler: htmlToProsemirrorNode,
       }),
     );
 
@@ -454,16 +455,18 @@ test('support for rendering a nested controlled editor in strict mode', () => {
     };
 
     return (
-      <RemirrorProvider manager={manager} onChange={onChange} value={value}>
+      <Remirror manager={manager} onChange={onChange} state={value}>
         <div id='1'>
           <TextEditor />
         </div>
-      </RemirrorProvider>
+      </Remirror>
     );
   };
 
   const TextEditor = () => {
-    const { getRootProps, active, commands } = useRemirror<BoldExtension>({ autoUpdate: true });
+    const { getRootProps, active, commands } = useRemirrorContext<BoldExtension>({
+      autoUpdate: true,
+    });
 
     return (
       <>
@@ -503,7 +506,7 @@ describe('onChange', () => {
       manager.createState({
         content: '<p>A</p>',
         selection: 'end',
-        stringHandler: fromHtml,
+        stringHandler: htmlToProsemirrorNode,
       }),
     );
 
@@ -512,9 +515,7 @@ describe('onChange', () => {
       mock(value.doc.textContent);
     };
 
-    return (
-      <RemirrorProvider manager={manager} onChange={onChange} value={value} autoRender={true} />
-    );
+    return <Remirror manager={manager} onChange={onChange} state={value} autoRender={true} />;
   };
 
   beforeEach(() => {

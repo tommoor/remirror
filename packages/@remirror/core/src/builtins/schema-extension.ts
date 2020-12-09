@@ -36,18 +36,18 @@ import {
 } from '@remirror/core-utils';
 import { MarkSpec, NodeSpec, Schema } from '@remirror/pm/model';
 
-import { extensionDecorator } from '../decorators';
 import {
   AnyExtension,
+  extension,
+  GetExtensions,
   GetMarkNameUnion,
   GetNodeNameUnion,
+  GetSchema,
   isMarkExtension,
   isNodeExtension,
   PlainExtension,
-  SchemaFromExtensionUnion,
 } from '../extension';
-import type { AnyCombinedUnion, InferCombinedExtensions } from '../preset';
-import type { CreatePluginReturn } from '../types';
+import type { CreateExtensionPlugin } from '../types';
 import type { CombinedTags } from './tags-extension';
 
 /**
@@ -64,7 +64,7 @@ import type { CombinedTags } from './tags-extension';
  * In order to add extra attributes the following would work.
  *
  * ```ts
- * import { RemirrorManager } from 'remirror/core';
+ * import { RemirrorManager } from 'remirror';
  * import uuid from 'uuid';
  * import hash from 'made-up-hasher';
  *
@@ -90,9 +90,9 @@ import type { CombinedTags } from './tags-extension';
  * function allows you to set up a dynamic attribute which is updated with the
  * synchronous function that you provide to it.
  *
- * @builtin
+ * @category Builtin Extension
  */
-@extensionDecorator({ defaultPriority: ExtensionPriority.Highest })
+@extension({ defaultPriority: ExtensionPriority.Highest })
 export class SchemaExtension extends PlainExtension {
   get name() {
     return 'schema' as const;
@@ -114,7 +114,10 @@ export class SchemaExtension extends PlainExtension {
    * and check for new nodes and marks which haven't yet applied the dynamic
    * attribute and add the attribute.
    */
-  #dynamicAttributes: DynamicSchemaAttributeCreators = { marks: object(), nodes: object() };
+  private readonly dynamicAttributes: DynamicSchemaAttributeCreators = {
+    marks: object(),
+    nodes: object(),
+  };
 
   /**
    * This method is responsible for creating, configuring and adding the
@@ -172,11 +175,11 @@ export class SchemaExtension extends PlainExtension {
         // Create the spec and gather dynamic attributes for this node
         // extension.
         const { spec, dynamic } = createSpec({
-          createExtensionSpec: (extra) => extension.createNodeSpec(extra),
+          createExtensionSpec: (extra, overrides) => extension.createNodeSpec(extra, override),
           extraAttributes: namedExtraAttributes[extension.name],
           ignoreExtraAttributes,
           name: extension.constructorName,
-          tags: extension.tags ?? [],
+          tags: extension.tags,
         });
 
         // Store the node spec on the extension for future reference.
@@ -189,7 +192,7 @@ export class SchemaExtension extends PlainExtension {
         // Keep track of the dynamic attributes. The `extension.name` is the
         // same name of the `NodeType` and is used by the plugin in this
         // extension to dynamically generate attributes for the correct nodes.
-        this.#dynamicAttributes.nodes[extension.name] = dynamic;
+        this.dynamicAttributes.nodes[extension.name] = dynamic;
       }
 
       // Very similar to the previous conditional block except for marks rather
@@ -211,7 +214,7 @@ export class SchemaExtension extends PlainExtension {
         // Add the spec to the `marks` object which is used to create the schema
         // with the same name as the extension name.
         marks[extension.name] = spec as MarkSpec;
-        this.#dynamicAttributes.marks[extension.name] = dynamic;
+        this.dynamicAttributes.marks[extension.name] = dynamic;
       }
     }
 
@@ -230,7 +233,7 @@ export class SchemaExtension extends PlainExtension {
    * This creates the plugin that is used to automatically create the dynamic
    * attributes defined in the extra attributes object.
    */
-  createPlugin(): CreatePluginReturn {
+  createPlugin(): CreateExtensionPlugin {
     return {
       appendTransaction: (transactions, _, nextState) => {
         // This creates a new transaction which will be used to update the
@@ -251,8 +254,8 @@ export class SchemaExtension extends PlainExtension {
         // committing to that level of work let's check that there user has
         // actually defined some dynamic attributes.
         if (
-          isEmptyObject(this.#dynamicAttributes.nodes) ||
-          isEmptyObject(this.#dynamicAttributes.marks)
+          isEmptyObject(this.dynamicAttributes.nodes) ||
+          isEmptyObject(this.dynamicAttributes.marks)
         ) {
           return null;
         }
@@ -317,7 +320,7 @@ export class SchemaExtension extends PlainExtension {
     const { node, pos } = child;
 
     // Check for matching nodes.
-    for (const [name, dynamic] of entries(this.#dynamicAttributes.nodes)) {
+    for (const [name, dynamic] of entries(this.dynamicAttributes.nodes)) {
       if (node.type.name !== name) {
         continue;
       }
@@ -351,7 +354,7 @@ export class SchemaExtension extends PlainExtension {
     const { node, pos } = child;
 
     // Check for matching marks.
-    for (const [name, dynamic] of entries(this.#dynamicAttributes.marks)) {
+    for (const [name, dynamic] of entries(this.dynamicAttributes.marks)) {
       // This is needed to create the new mark. Even though a mark may already
       // exist ProseMirror requires that a new one is created and added in
       // order. More details available
@@ -424,9 +427,9 @@ export class SchemaExtension extends PlainExtension {
  * will be the basis for adding advanced formatting to remirror.
  *
  * ```ts
- * import { ExtensionTag } from 'remirror/core';
- * import { createCoreManager, CorePreset } from 'remirror/preset/core';
- * import { WysiwygPreset } from 'remirror/preset/wysiwyg';
+ * import { ExtensionTag } from 'remirror';
+ * import { createCoreManager, CorePreset } from 'remirror/extensions';
+ * import { WysiwygPreset } from 'remirror/extensions';
  *
  * const manager = createCoreManager(() => [new WysiwygPreset(), new CorePreset()], {
  *   extraAttributes: [
@@ -684,7 +687,7 @@ interface CreateSpecReturn<Type extends { group?: string | null }> {
 /**
  * Create the scheme spec for a node or mark extension.
  *
- * @typeParam Type - either a [[Mark]] or a [[ProsemirrorNode]]
+ * @template Type - either a [[Mark]] or a [[ProsemirrorNode]]
  * @param parameter - the options object [[CreateSpecParameter]]
  */
 function createSpec<Type extends { group?: string | null }>(
@@ -921,7 +924,7 @@ function getSpecFromSchema(schema: EditorSchema) {
 
 declare global {
   namespace Remirror {
-    interface ExtensionCreatorMethods {
+    interface BaseExtension {
       /**
        * Allows the extension to create an extra attributes array that will be
        * added to the extra attributes.
@@ -953,6 +956,16 @@ declare global {
        * @default undefined
        */
       disableExtraAttributes?: Static<boolean>;
+
+      /**
+       * Overrides for a mark extension
+       */
+      markOverrides?: any;
+
+      /**
+       * Overrides for a node extension.
+       */
+      nodeOverrides?: any;
     }
 
     interface ManagerSettings {
@@ -966,7 +979,7 @@ declare global {
        * An example is shown below.
        *
        * ```ts
-       * import { RemirrorManager } from 'remirror/core';
+       * import { RemirrorManager } from 'remirror';
        *
        * const managerSettings = {
        *   extraAttributes: [
@@ -1008,21 +1021,21 @@ declare global {
       schema?: EditorSchema;
     }
 
-    interface ManagerStore<Combined extends AnyCombinedUnion> {
+    interface ManagerStore<ExtensionUnion extends AnyExtension> {
       /**
        * The nodes to place on the schema.
        */
-      nodes: Record<GetNodeNameUnion<InferCombinedExtensions<Combined>>, NodeExtensionSpec>;
+      nodes: Record<GetNodeNameUnion<GetExtensions<ExtensionUnion>>, NodeExtensionSpec>;
 
       /**
        * The marks to be added to the schema.
        */
-      marks: Record<GetMarkNameUnion<InferCombinedExtensions<Combined>>, MarkExtensionSpec>;
+      marks: Record<GetMarkNameUnion<GetExtensions<ExtensionUnion>>, MarkExtensionSpec>;
 
       /**
        * The schema created by this extension manager.
        */
-      schema: SchemaFromExtensionUnion<InferCombinedExtensions<Combined>>;
+      schema: GetSchema<GetExtensions<ExtensionUnion>>;
     }
 
     interface MarkExtension {

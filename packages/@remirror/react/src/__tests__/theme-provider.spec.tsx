@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { strictRender } from '@remirror/testing/react';
 
 import { ThemeProvider } from '../react-providers';

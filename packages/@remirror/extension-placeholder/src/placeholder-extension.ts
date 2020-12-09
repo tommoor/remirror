@@ -1,8 +1,6 @@
-import { css } from 'linaria';
-
 import {
-  CreatePluginReturn,
-  extensionDecorator,
+  CreateExtensionPlugin,
+  extension,
   isDocNodeEmpty,
   ManagerPhase,
   OnSetOptionsParameter,
@@ -12,25 +10,7 @@ import {
 } from '@remirror/core';
 import type { EditorState } from '@remirror/pm/state';
 import { Decoration, DecorationSet } from '@remirror/pm/view';
-
-const isEmptyStyles = css`
-  &:first-of-type::before {
-    position: absolute;
-    color: #aaa;
-    pointer-events: none;
-    height: 0;
-    font-style: italic;
-    content: attr(data-placeholder);
-  }
-`;
-
-/**
- * Used to denote a node is empty.
- *
- * Currently used by the placeholder extension.
- */
-export const EMPTY_NODE_CLASS_NAME = isEmptyStyles;
-export const EMPTY_NODE_CLASS_SELECTOR = `.${EMPTY_NODE_CLASS_NAME}`;
+import { ExtensionPlaceholder } from '@remirror/theme';
 
 export interface PlaceholderOptions {
   /**
@@ -52,9 +32,9 @@ export interface PlaceholderPluginState extends Required<PlaceholderOptions> {
 /**
  * An extension for the remirror editor. CHANGE ME.
  */
-@extensionDecorator<PlaceholderOptions>({
+@extension<PlaceholderOptions>({
   defaultOptions: {
-    emptyNodeClass: EMPTY_NODE_CLASS_NAME,
+    emptyNodeClass: ExtensionPlaceholder.IS_EMPTY,
     placeholder: '',
   },
 })
@@ -67,7 +47,7 @@ export class PlaceholderExtension extends PlainExtension<PlaceholderOptions> {
     return { 'aria-placeholder': this.options.placeholder };
   }
 
-  createPlugin(): CreatePluginReturn {
+  createPlugin(): CreateExtensionPlugin {
     return {
       state: {
         init: (_, state): PlaceholderPluginState => ({
@@ -86,7 +66,7 @@ export class PlaceholderExtension extends PlainExtension<PlaceholderOptions> {
     };
   }
 
-  onSetOptions(parameter: OnSetOptionsParameter<PlaceholderOptions>): void {
+  protected onSetOptions(parameter: OnSetOptionsParameter<PlaceholderOptions>): void {
     const { changes } = parameter;
 
     if (changes.placeholder.changed && this.store.phase >= ManagerPhase.EditorView) {

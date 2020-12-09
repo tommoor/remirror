@@ -349,11 +349,11 @@ type NeverBrand = Brand<object, never>;
  * This is useful for dynamically setting the parameter list of a method call
  * depending on whether keys are required.
  */
-export type IfNoRequiredProperties<Type extends object, Then, Else> = GetRequiredKeys<
-  Type
-> extends NeverBrand
-  ? Then
-  : Else;
+export type IfNoRequiredProperties<
+  Type extends object,
+  Then,
+  Else
+> = GetRequiredKeys<Type> extends NeverBrand ? Then : Else;
 
 /**
  * Get all the keys for required properties on this type.
@@ -451,6 +451,60 @@ export type Replace<Type, Replacements extends Shape> = Omit<Type, keyof Replace
 export type NonNullableShape<Type extends object> = {
   [Key in keyof Type]: NonNullable<Type[Key]>;
 };
+
+/**
+ * Conditionally pick keys which are functions and have the requested return
+ * type.
+ */
+export type ConditionalReturnKeys<Base, Return> = NonNullable<
+  // Wrap in `NonNullable` to strip away the `undefined` type from the produced union.
+  {
+    // Map through all the keys of the given base type.
+    [Key in keyof Base]: Base[Key] extends AnyFunction<infer R> // Pick only keys with types extending the given `Return` type.
+      ? // Check whether the inferred `R` type extends the requested `Return` type.
+        R extends Return
+        ? // The check passes therefor keep the key
+          Key
+        : // Discard this key since it the return type does not match.
+          never
+      : // Discard this key since it is not a function.
+        never;
+
+    // Convert the produced object into a union type of the keys which passed the conditional test.
+  }[keyof Base]
+>;
+
+/**
+ * Pick the properties from an object that are methods with the requested
+ * `Return` type.
+ */
+export type ConditionalReturnPick<Base, Return> = Pick<Base, ConditionalReturnKeys<Base, Return>>;
+
+type GetRecursivePath<Type, Key extends keyof Type> = Key extends string
+  ? Type[Key] extends Record<string, any>
+    ?
+        | `${Key}.${GetRecursivePath<Type[Key], Exclude<keyof Type[Key], keyof any[]>> & string}`
+        | `${Key}.${Exclude<keyof Type[Key], keyof any[]> & string}`
+    : never
+  : never;
+type GetJoinedPath<Type> = GetRecursivePath<Type, keyof Type> | keyof Type;
+
+export type GetPath<Type> = GetJoinedPath<Type> extends string | keyof Type
+  ? GetJoinedPath<Type>
+  : keyof Type;
+
+export type GetPathValue<
+  Type,
+  Path extends GetPath<Type>
+> = Path extends `${infer Key}.${infer Rest}`
+  ? Key extends keyof Type
+    ? Rest extends GetPath<Type[Key]>
+      ? GetPathValue<Type[Key], Rest>
+      : never
+    : never
+  : Path extends keyof Type
+  ? Type[Path]
+  : never;
 
 declare global {
   namespace Remirror {

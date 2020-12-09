@@ -8,7 +8,7 @@ import {
   EmojiSuggestionChangeHandler,
 } from '@remirror/extension-emoji';
 import type { SuggestChangeHandlerParameter } from '@remirror/pm/suggest';
-import { useExtension, useRemirror } from '@remirror/react';
+import { useExtension, useRemirrorContext } from '@remirror/react';
 
 import { indexFromArrowPress } from './react-hook-utils';
 import { useKeymap } from './use-keymap';
@@ -76,7 +76,7 @@ function useEmojiChangeHandler(setState: SetEmojiState) {
  * A hook for adding keybindings to the emoji dropdown.
  */
 function useEmojiKeyBindings(setState: SetEmojiState, state: EmojiState | null) {
-  const { helpers } = useRemirror();
+  const { helpers } = useRemirrorContext();
 
   /**
    * Create the arrow bindings for the emoji suggesters.

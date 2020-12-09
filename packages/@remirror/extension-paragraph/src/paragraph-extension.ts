@@ -1,7 +1,7 @@
 import {
   ApplySchemaAttributes,
   CommandFunction,
-  extensionDecorator,
+  extension,
   ExtensionPriority,
   ExtensionTag,
   NodeExtension,
@@ -16,7 +16,7 @@ import {
  *
  * @core
  */
-@extensionDecorator({
+@extension({
   defaultPriority: ExtensionPriority.Medium,
 })
 export class ParagraphExtension extends NodeExtension {
@@ -24,7 +24,9 @@ export class ParagraphExtension extends NodeExtension {
     return 'paragraph' as const;
   }
 
-  readonly tags = [ExtensionTag.LastNodeCompatible, ExtensionTag.BlockNode];
+  createTags() {
+    return [ExtensionTag.LastNodeCompatible, ExtensionTag.BlockNode];
+  }
 
   createNodeSpec(extra: ApplySchemaAttributes): NodeExtensionSpec {
     return {

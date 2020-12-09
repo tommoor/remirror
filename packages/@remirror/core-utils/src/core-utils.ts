@@ -1,9 +1,11 @@
 import { ErrorConstant, LEAF_NODE_REPLACING_CHARACTER } from '@remirror/core-constants';
 import {
+  assert,
   bool,
   Cast,
   clamp,
   invariant,
+  isArray,
   isFunction,
   isNullOrUndefined,
   isNumber,
@@ -25,6 +27,7 @@ import type {
   MarkAttributes,
   MarkTypeParameter,
   NodeAttributes,
+  PosParameter,
   PrimitiveSelection,
   ProsemirrorNode,
   ProsemirrorNodeParameter,
@@ -34,6 +37,7 @@ import type {
   ResolvedPos,
   SchemaParameter,
   Selection,
+  TextParameter,
   Transaction,
   TrStateParameter,
 } from '@remirror/core-types';
@@ -372,7 +376,7 @@ function isValidStep(step: Step, StepTypes: Array<AnyConstructor<Step>>) {
  */
 export function getChangedRanges(
   tr: Transaction,
-  StepTypes: Array<AnyConstructor<Step>> = [ReplaceStep],
+  StepTypes: Array<AnyConstructor<Step>> = [],
 ): FromToParameter[] {
   // The holder for the ranges value which will be returned from this function.
   const ranges: FromToParameter[] = [];
@@ -402,7 +406,7 @@ export function getChangedRanges(
     if (noOverlap) {
       // Add the new range when no overlap is found.
       ranges.push({ from, to });
-    } else {
+    } else if (lastRange) {
       // Update the lastRange's end value.
       lastRange.to = Math.max(lastRange.from, to);
     }
@@ -539,7 +543,12 @@ export function getSelectedWord(state: EditorState | Transaction): FromToParamet
  * @param index - the zero-index point from which to start
  */
 export function getMatchString(match: string | string[], index = 0): string {
-  return Array.isArray(match) ? match[index] : match;
+  const value = isArray(match) ? match[index] : match;
+
+  // Throw an error if value is not defined for the index.
+  assert(value);
+
+  return value;
 }
 
 /**
@@ -687,9 +696,31 @@ export function isRemirrorJSON(value: unknown): value is RemirrorJSON {
   return isObject(value) && value.type === 'doc' && Array.isArray(value.content);
 }
 
+/**
+ * This type is the combination of all the registered string handlers for the
+ * extension. This is used rather than the `StringHandlers` in order to enforce
+ * the type signature of the handler method, which isn't possible with the
+ * interface.
+ */
+export type NamedStringHandlers = { [K in keyof Remirror.StringHandlers]: StringHandler };
+
+export interface HandlersParameter {
+  /**
+   * All the available string handlers which have been made available for this
+   * editor. Using this allows for composition of [[`StringHandler`]]'s.
+   *
+   * For example, the markdown string handler first converts the markdown string
+   * to html and then uses the html handler to convert the html output to a
+   * prosemirror step.
+   *
+   * Composition for the win.
+   */
+  handlers: NamedStringHandlers;
+}
+
 export interface CreateDocumentNodeParameter
   extends SchemaParameter,
-    Partial<CustomDocParameter>,
+    Partial<CustomDocumentParameter>,
     StringHandlerParameter {
   /**
    * The content to render
@@ -782,7 +813,7 @@ export function getTextSelection(
 /**
  * A function that converts a string into a `ProsemirrorNode`.
  */
-export type StringHandler = (params: FromStringParameter) => ProsemirrorNode;
+export type StringHandler = (params: StringHandlerOptions) => ProsemirrorNode;
 
 export interface StringHandlerParameter {
   /**
@@ -812,14 +843,12 @@ const MAX_ATTEMPTS = 3;
  *
  * Please note that the `onError` is only called when the content is a JSON
  * object. It is not called for a `string`, the `ProsemirrorNode` or the
- * `EditorState`. The reason for this is that string require a `stringHandler`
+ * `EditorState`. The reason for this is that the `string` requires a `stringHandler`
  * which is defined by the developer and transforms the content. That is the
  * point that error's should be handled. The editor state and the
  * `ProsemirrorNode` are similar. They need to be created by the developer and
  * as a result, the errors should be handled at the point of creation rather
  * than when the document is being applied to the editor.
- *
- * @param parameter - the destructured create document node params
  */
 export function createDocumentNode(parameter: CreateDocumentNodeParameter): ProsemirrorNode {
   const { content, schema, document, stringHandler, onError, attempts = 0 } = parameter;
@@ -840,9 +869,11 @@ export function createDocumentNode(parameter: CreateDocumentNodeParameter): Pros
       message: `The string '${content}' was added to the editor, but no \`stringHandler\` was added. Please provide a valid string handler which transforms your content to a \`ProsemirrorNode\` to prevent this error.`,
     });
 
+    const options = { document, content, schema };
+
     // With string content it is up to you the developer to ensure there are no
     // errors in the produced content.
-    return stringHandler({ document, content, schema });
+    return stringHandler(options);
   }
 
   // If passing in an editor state, it is left to the developer to make sure the
@@ -908,48 +939,54 @@ export function getDocument(forceEnvironment?: RenderEnvironment): Document {
   return shouldUseDomEnvironment(forceEnvironment) ? document : require('min-document');
 }
 
-interface CustomDocParameter {
-  /** The root or custom document to use (allows for ssr rendering) */
+export interface CustomDocumentParameter {
+  /**
+   * The root or custom document to use when referencing the dom.
+   *
+   * This can be used to support SSR.
+   */
   document: Document;
 }
 
 /**
  * Convert a node into its DOM representative
  *
- * @param params - the from node params
+ * @param node - the node to extract html from.
+ * @param document - the document to use for the DOM
  */
-export function toDom({ node, schema, document }: FromNodeParameter): DocumentFragment {
-  const fragment = isDocNode(node, schema) ? node.content : Fragment.from(node);
-  return DOMSerializer.fromSchema(schema).serializeFragment(fragment, { document });
+export function prosemirrorNodeToDom(
+  node: ProsemirrorNode,
+  document = getDocument(),
+): DocumentFragment {
+  const fragment = isDocNode(node, node.type.schema) ? node.content : Fragment.from(node);
+  return DOMSerializer.fromSchema(node.type.schema).serializeFragment(fragment, { document });
 }
-
-interface FromNodeParameter
-  extends SchemaParameter,
-    ProsemirrorNodeParameter,
-    Partial<CustomDocParameter> {}
 
 /**
  * Convert the provided `node` to a html string.
  *
- * @param params - the from node params
+ * @param node - the node to extract html from.
+ * @param document - the document to use for the DOM
  *
  * ```ts
- * import { EditorState, toHtml } from 'remirror/core';
+ * import { EditorState, toHtml } from 'remirror';
  *
  * function convertStateToHtml(state: EditorState): string {
- *   return toHtml({ node: state.doc, schema: state.schema });
+ *   return prosemirrorNodeToHtml({ node: state.doc, schema: state.schema });
  * }
  * ```
  */
-export function toHtml({ node, schema, document = getDocument() }: FromNodeParameter): string {
+export function prosemirrorNodeToHtml(node: ProsemirrorNode, document = getDocument()): string {
   const element = document.createElement('div');
-  element.append(toDom({ node, schema, document }));
+  element.append(prosemirrorNodeToDom(node, document));
 
   return element.innerHTML;
 }
 
-interface FromStringParameter extends Partial<CustomDocParameter>, SchemaParameter {
-  /** The content  passed in an a string */
+export interface StringHandlerOptions extends Partial<CustomDocumentParameter>, SchemaParameter {
+  /**
+   * The string content provided to the editor.
+   */
   content: string;
 }
 
@@ -958,25 +995,25 @@ interface FromStringParameter extends Partial<CustomDocParameter>, SchemaParamet
  * `stringHandler` property in your editor when you want to support html.
  *
  * ```tsx
- * import { fromHtml } from 'remirror/core';
- * import { RemirrorProvider, useManager } from 'remirror/react';
+ * import { fromHtml } from 'remirror';
+ * import { Remirror, useManager } from 'remirror/react';
  *
  * const Editor = () => {
  *   const manager = useManager([]);
  *
  *   return (
- *     <RemirrorProvider
+ *     <Remirror
  *       stringHandler={fromHtml}
  *       initialContent='<p>A wise person once told me to relax</p>'
  *     >
  *       <div />
- *     </RemirrorProvider>
+ *     </Remirror>
  *   );
  * }
  * ```
  */
-export function fromHtml(parameter: FromStringParameter): ProsemirrorNode {
-  const { content, schema, document = getDocument() } = parameter;
+export function htmlToProsemirrorNode(parameter: StringHandlerOptions): ProsemirrorNode {
+  const { content: content, schema, document = getDocument() } = parameter;
   const element = document.createElement('div');
   element.innerHTML = content.trim();
 
@@ -1071,7 +1108,8 @@ export function areSchemasCompatible(schemaA: EditorSchema, schemaB: EditorSchem
 }
 
 /**
- * Returns attributes for a node excluding those that were provided as extra attributes
+ * Return attributes for a node excluding those that were provided as extra
+ * attributes.
  *
  * @param attrs - The source attributes
  * @param extra - The extra attribute schema for this node
@@ -1082,6 +1120,46 @@ export function omitExtraAttributes(
 ): DOMCompatibleAttributes {
   const extraAttributeNames = keys(extra.defaults());
   return omit({ ...attrs }, extraAttributeNames) as DOMCompatibleAttributes;
+}
+
+interface TextBetweenParameter extends FromToParameter {
+  /**
+   * The prosemirror `doc` node.
+   */
+  doc: ProsemirrorNode;
+}
+
+interface TextBetween extends PosParameter, TextParameter {}
+
+/**
+ * Find the different ranges of text between a provided range with support for
+ * traversing multiple nodes.
+ */
+export function textBetween(parameter: TextBetweenParameter): TextBetween[] {
+  const { from, to, doc } = parameter;
+  const positions: TextBetween[] = [];
+
+  doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText || !node.text) {
+      return;
+    }
+
+    const offset = Math.max(from, pos) - pos;
+    positions.push({
+      pos: pos + offset,
+      text: node.text.slice(offset, to - pos),
+    });
+  });
+
+  return positions;
+}
+
+/**
+ * Get the full range of the selectable content in the ProseMirror `doc`.
+ */
+export function getDocRange(doc: ProsemirrorNode): FromToParameter {
+  const { from, to } = new AllSelection(doc);
+  return { from, to };
 }
 
 /**
@@ -1274,4 +1352,15 @@ function checkForInvalidContent(parameter: CheckForInvalidContentParameter): Inv
   }
 
   return invalidNodes;
+}
+
+declare global {
+  namespace Remirror {
+    /**
+     * This interface provides all the named string handlers. The key is the
+     * only part that's used meaning the value isn't important. However, it's
+     * conventional to use the Extension for the value.
+     */
+    interface StringHandlers {}
+  }
 }

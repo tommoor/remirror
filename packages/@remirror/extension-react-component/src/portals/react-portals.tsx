@@ -1,18 +1,14 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-
-import type { AnyCombinedUnion, FrameworkOutput } from '@remirror/core';
 
 import type { MountedPortal, PortalContainer, PortalMap } from './portal-container';
 
-export interface RemirrorPortalsProps<Combined extends AnyCombinedUnion> {
+export interface RemirrorPortalsProps {
   /**
    * An array of tuples holding all the element containers for node view
    * portals.
    */
   portals: Array<[HTMLElement, MountedPortal]>;
-
-  context: FrameworkOutput<Combined>;
 }
 
 /**
@@ -21,16 +17,15 @@ export interface RemirrorPortalsProps<Combined extends AnyCombinedUnion> {
  * Portals can currently be created by a [[`ReactNodeView`]] and coming soon
  * both the [[`ReactMarkView`]] and [[`ReactDecoration`]].
  */
-export const RemirrorPortals = <Combined extends AnyCombinedUnion>(
-  props: RemirrorPortalsProps<Combined>,
-): JSX.Element => {
-  const { context, portals } = props;
+export const RemirrorPortals = (props: RemirrorPortalsProps): JSX.Element => {
+  const { portals } = props;
+
   return (
-    <EditorContext.Provider value={context}>
+    <>
       {portals.map(([container, { Component, key }]) =>
         createPortal(<Component />, container, key),
       )}
-    </EditorContext.Provider>
+    </>
   );
 };
 
@@ -53,15 +48,3 @@ export function usePortals(portalContainer: PortalContainer): Array<[HTMLElement
 
   return portals;
 }
-
-/**
- * Get the current remirror context when using a portal.
- */
-export function usePortalContext<Combined extends AnyCombinedUnion>(): FrameworkOutput<Combined> {
-  return useContext(EditorContext) as FrameworkOutput<Combined>;
-}
-
-/**
- * Allows elemenent inside the portals to consume the provided contenxt
- */
-const EditorContext = createContext<FrameworkOutput<any> | null>(null);

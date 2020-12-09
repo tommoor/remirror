@@ -1,5 +1,5 @@
 import type {
-  AnyCombinedUnion,
+  AnyExtension,
   AttributesParameter,
   EditorSchema,
   MarkAttributes,
@@ -103,9 +103,9 @@ export type NodeWithoutAttributes<Names extends string> = {
   [P in Names]: (...content: TaggedContentWithText[]) => TaggedProsemirrorNode;
 };
 
-export interface RenderEditorParameter<Combined extends AnyCombinedUnion>
+export interface RenderEditorParameter<ExtensionUnion extends AnyExtension>
   extends CreateCoreManagerOptions {
-  props?: Partial<Omit<DomFrameworkProps<Combined>, 'manager'>>;
+  props?: Partial<Omit<DomFrameworkProps<ExtensionUnion>, 'manager'>>;
 
   /**
    * Whether to automatically cleanup the dom once the test finishes.

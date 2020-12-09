@@ -75,9 +75,9 @@ No directly invoking the editor manager with `new`. Instead use one of the stati
 
 ### RMR0010
 
-> Invalid Preset Extension
+> Invalid Get Extension
 
-The user requested an invalid extension from the preset. Please check the `createExtensions` return method is returning an extension with the defined constructor.
+The user requested an invalid extension from the getExtensions method. Please check the `createExtensions` return method is returning an extension with the defined constructor.
 
 ### RMR0011
 
@@ -179,7 +179,7 @@ A call to `extension.setOptions()` was made with invalid keys.
 
 > React Provider Context
 
-**`useRemirror` was called outside of the remirror context. It can only be used within an active remirror context created by the `<RemirrorProvider />`.**
+**`useRemirrorContext` was called outside of the remirror context. It can only be used within an active remirror context created by the `<Remirror />` component.**
 
 ### RMR0201
 
@@ -189,20 +189,20 @@ A call to `extension.setOptions()` was made with invalid keys.
 
 This error happens because the `getRootProps` method is being used in a component that is rendered multiple times without updates from the react provider. The `getRootProps` method is responsible for collecting obtaining the HTMLElement via the `ref` prop and appending the prosemirror text editor to it. If that's done multiple times per render then it has problems.
 
-To fix this you should move the component calling `getRootProps` to a part of the tree that is only rerendered when the `RemirrorProvider` is updated.
+To fix this you should move the component calling `getRootProps` to a part of the tree that is only rerendered when the `Remirror` component is updated.
 
 For example the following would trigger this error.
 
 ```tsx
 import React from 'react';
-import { BoldExtension } from 'remirror/extension/bold';
-import { CorePreset } from 'remirror/preset/core';
-import { RemirrorProvider, useManager } from 'remirror/react';
+import { BoldExtension } from 'remirror/extensions';
+import { CorePreset } from 'remirror/extensions';
+import { Remirror, useRemirror, useRemirrorContext } from 'remirror/react';
 
 const Editor = () => {
   const [boldActive] = useState(false);
 
-  const { getRootProps, commands } = useRemirror({ autoUpdate: true });
+  const { getRootProps, commands } = useRemirrorContext({ autoUpdate: true });
 
   return (
     <div>
@@ -218,28 +218,28 @@ const Editor = () => {
 };
 
 const EditorWrapper = () => {
-  const manager = useManager([new CorePreset(), new BoldExtension()]);
+  const manager = useRemirror([new CorePreset(), new BoldExtension()]);
 
   return (
-    <RemirrorProvider manager={manager}>
+    <Remirror manager={manager}>
       <Editor />
-    </RemirrorProvider>
+    </Remirror>
   );
 };
 ```
 
-The onChange handler being passed into the `useRemirror` hook means that every time the editor content changes there will be a `setBoldActive` called which re-renders the `Internal` component. As a result `getRootProps` is called multiple times.
+The onChange handler being passed into the `useRemirrorContext` hook means that every time the editor content changes there will be a `setBoldActive` called which re-renders the `Internal` component. As a result `getRootProps` is called multiple times.
 
-To fix this issue you need to move the getRootProps to a part of the tree that only updates when the `RemirrorProvider` updates. There are several ways to do this and one of them is to split up the `Internal` component into two seperate components.
+To fix this issue you need to move the getRootProps to a part of the tree that only updates when the `Remirror` updates. There are several ways to do this and one of them is to split up the `Internal` component into two seperate components.
 
 The fixed code could look something like this.
 
 ```tsx
 import React from 'react';
-import { RemirrorProvider } from 'remirror/react';
+import { Remirror } from 'remirror/react';
 
 const Menu = () => {
-  const { commands, active } = useRemirror({ autoUpdate: true });
+  const { commands, active } = useRemirrorContext({ autoUpdate: true });
 
   return (
     <>
@@ -254,26 +254,26 @@ const Menu = () => {
 };
 
 const TextEditor = () => {
-  const { getRootProps } = useRemirror();
+  const { getRootProps } = useRemirrorContext();
 
   return <div {...getRootProps()} />;
 };
 
 const EditorWrapper = () => {
-  const manager = useManager([new CorePreset(), new BoldExtension()]);
+  const manager = useRemirror([new CorePreset(), new BoldExtension()]);
 
   return (
-    <RemirrorProvider manager={manager}>
+    <Remirror manager={manager}>
       <div>
         <Menu />
         <TextEditor />
       </div>
-    </RemirrorProvider>
+    </Remirror>
   );
 };
 ```
 
-Now the `TextEditor` component is only updated when the `RemirrorProvider` is updated.
+Now the `TextEditor` component is only updated when the `Remirror` is updated.
 
 ### RMR0202
 

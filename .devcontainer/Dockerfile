@@ -26,5 +26,6 @@ RUN apt-get update -yq && export DEBIAN_FRONTEND=noninteractive \
     && apt-get update -yq \
     && apt-get install -yq powershell
 
+ARG PNPM_VERSION="5.13.1"
 # Install more global node modules
-RUN sudo -u node npm install -g pnpm
+RUN sudo -u node npm install -g pnpm@${PNPM_VERSION}

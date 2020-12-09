@@ -1,11 +1,11 @@
 import {
-  CreatePluginReturn,
+  CreateExtensionPlugin,
   EditorState,
   EditorStateParameter,
   EditorViewParameter,
   entries,
   ErrorConstant,
-  extensionDecorator,
+  extension,
   ExtensionPriority,
   GetHandler,
   GetMarkRange,
@@ -75,7 +75,7 @@ export interface EventsOptions {
  * The events extension which listens to events which occur within the
  * remirror editor.
  */
-@extensionDecorator<EventsOptions>({
+@extension<EventsOptions>({
   handlerKeys: ['blur', 'focus', 'mousedown', 'mouseup', 'click', 'clickMark'],
   handlerKeyOptions: {
     blur: { earlyReturnValue: true },
@@ -122,7 +122,7 @@ export class EventsExtension extends PlainExtension<EventsOptions> {
    * Create the plugin which manages all of the events being listened to within
    * the editor.
    */
-  createPlugin(): CreatePluginReturn {
+  createPlugin(): CreateExtensionPlugin {
     // Since event methods can possible be run multiple times for the same event
     // outer node, it is possible that one event can be run multiple times. To
     // prevent needless potentially expensive recalculations, this weak map

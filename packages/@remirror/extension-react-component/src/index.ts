@@ -13,6 +13,6 @@ export type {
   RenderMethodParameter,
   RenderParameter,
 } from './portals';
-export { PortalContainer, RemirrorPortals, usePortalContext, usePortals } from './portals';
+export { PortalContainer, RemirrorPortals, usePortals } from './portals';
 
 export { ReactComponentExtension } from './react-component-extension';

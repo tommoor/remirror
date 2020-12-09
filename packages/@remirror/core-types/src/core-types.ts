@@ -33,8 +33,20 @@ export interface RemirrorJSON {
 }
 
 export interface StateJSON {
+  /**
+   * This allows for plugin state to be stored, although this is not currently
+   * used in remirror.
+   */
   [key: string]: unknown;
+
+  /**
+   * The main `ProseMirror` doc.
+   */
   doc: RemirrorJSON;
+
+  /**
+   * The current selection.
+   */
   selection: FromToParameter;
 }
 
@@ -48,8 +60,7 @@ export type GetAttributes = ProsemirrorAttributes | GetAttributesFunction;
 
 export interface GetAttributesParameter {
   /**
-   * A helper function for setting receiving a match array / string and setting
-   * the attributes for a node.
+   * A helper function for setting the attributes for a transformation .
    */
   getAttributes: GetAttributes;
 }
@@ -64,7 +75,7 @@ export interface GetAttributesParameter {
  * - JSON object matching Prosemirror expected shape
  * - A top level ProsemirrorNode
  *
- * @typeParam Schema - the underlying editor schema.
+ * @template Schema - the underlying editor schema.
  */
 export type RemirrorContentType<Schema extends EditorSchema = EditorSchema> =
   | string
@@ -72,7 +83,7 @@ export type RemirrorContentType<Schema extends EditorSchema = EditorSchema> =
   | ProsemirrorNode<Schema>
   | EditorState<Schema>;
 
-export interface NextParameter<Schema extends EditorSchema = EditorSchema>
+export interface KeyBindingParameter<Schema extends EditorSchema = EditorSchema>
   extends CommandFunctionParameter<Schema> {
   /**
    * A method to run the next (lower priority) command in the chain of
@@ -96,16 +107,15 @@ export interface NextParameter<Schema extends EditorSchema = EditorSchema>
 /**
  * The command function passed to any of the keybindings.
  */
-export type KeyBindingCommandFunction<Schema extends EditorSchema = EditorSchema> = CommandFunction<
-  Schema,
-  NextParameter<Schema>
->;
+export type KeyBindingCommandFunction<Schema extends EditorSchema = EditorSchema> = (
+  params: KeyBindingParameter<Schema>,
+) => boolean;
 
 /**
  * A map of keyboard bindings and their corresponding command functions (a.k.a
  * editing actions).
  *
- * @typeParam Schema - the underlying editor schema.
+ * @template Schema - the underlying editor schema.
  *
  * @remarks
  *

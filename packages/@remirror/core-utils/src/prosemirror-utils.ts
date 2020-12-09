@@ -3,8 +3,8 @@ import {
   entries,
   invariant,
   isArray,
-  isEmptyArray,
   isEmptyObject,
+  isNonEmptyArray,
   isNullOrUndefined,
   object,
 } from '@remirror/core-helpers';
@@ -607,7 +607,7 @@ export function chainKeyBindingCommands<Schema extends EditorSchema = EditorSche
 ): KeyBindingCommandFunction<Schema> {
   return (parameters) => {
     // When no commands are passed just ignore and continue.
-    if (isEmptyArray(commands)) {
+    if (!isNonEmptyArray(commands)) {
       return false;
     }
 
@@ -625,7 +625,7 @@ export function chainKeyBindingCommands<Schema extends EditorSchema = EditorSche
       ...nextCommands: Array<KeyBindingCommandFunction<Schema>>
     ): (() => boolean) => () => {
       // If there are no commands then this can be ignored and continued.
-      if (isEmptyArray(nextCommands)) {
+      if (!isNonEmptyArray(nextCommands)) {
         return false;
       }
 
@@ -669,8 +669,8 @@ export function chainKeyBindingCommands<Schema extends EditorSchema = EditorSche
  * - It is used to create the [[`mergeKeyBindings`]] function helper.
  * - It is used to create the [[`mergeProsemirrorKeyBindings`]] function helper.
  *
- * @typeParam [Schema] - the schema that is being used to create this command.
- * @typeParam [Type] - the mapper type signature which is what the `mapper`
+ * @template [Schema] - the schema that is being used to create this command.
+ * @template [Type] - the mapper type signature which is what the `mapper`
  * param transforms the [[`KeyBindingCommandFunction`]]  into.
  *
  * @param extensionKeymaps - the list of extension keymaps similar to the

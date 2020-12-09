@@ -1,28 +1,29 @@
 import {
   ApplySchemaAttributes,
   CommandFunction,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   InputRule,
   KeyBindings,
   MarkExtension,
   MarkExtensionSpec,
   markInputRule,
-  markPasteRule,
-  ProsemirrorPlugin,
   toggleMark,
 } from '@remirror/core';
+import { MarkPasteRule } from '@remirror/pm/paste-rules';
 
 /**
  * The extension for adding strike-through marks to the editor.
  */
-@extensionDecorator({})
+@extension({})
 export class StrikeExtension extends MarkExtension {
   get name() {
     return 'strike' as const;
   }
 
-  readonly tags = [ExtensionTag.FontStyle];
+  createTags() {
+    return [ExtensionTag.FontStyle];
+  }
 
   createMarkSpec(extra: ApplySchemaAttributes): MarkExtensionSpec {
     return {
@@ -68,8 +69,8 @@ export class StrikeExtension extends MarkExtension {
     return [markInputRule({ regexp: /~([^~]+)~$/, type: this.type, ignoreWhitespace: true })];
   }
 
-  createPasteRules(): ProsemirrorPlugin[] {
-    return [markPasteRule({ regexp: /~([^~]+)~/g, type: this.type })];
+  createPasteRules(): MarkPasteRule[] {
+    return [{ regexp: /~([^~]+)~/g, type: 'mark', markType: this.type }];
   }
 }
 

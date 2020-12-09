@@ -1,29 +1,32 @@
-import { css } from 'linaria';
 import {
   defaultCursorBuilder,
   redo,
   undo,
   yCursorPlugin,
-  YSyncOpts,
   ySyncPlugin,
   yUndoPlugin,
   yUndoPluginKey,
 } from 'y-prosemirror';
+import { YSyncOpts } from 'y-prosemirror/dist/src/plugins/sync-plugin';
 import type { Doc, UndoManager } from 'yjs';
 
 import {
   AcceptUndefined,
-  CommandFunction,
+  command,
   convertCommand,
   EditorState,
   environment,
   ErrorConstant,
-  extensionDecorator,
+  extension,
   ExtensionPriority,
   invariant,
   isEmptyObject,
   isFunction,
+  keyBinding,
+  KeyBindingParameter,
+  NamedShortcut,
   nonChainable,
+  NonChainableCommandFunction,
   OnSetOptionsParameter,
   PlainExtension,
   PrioritizedKeyBindings,
@@ -97,7 +100,7 @@ export interface YjsOptions<Provider extends YjsRealtimeProvider = YjsRealtimePr
  * The YJS extension is the recommended extension for creating a collaborative
  * editor.
  */
-@extensionDecorator<YjsOptions>({
+@extension<YjsOptions>({
   defaultOptions: {
     getProvider: (): never => {
       invariant(false, {
@@ -120,7 +123,7 @@ export class YjsExtension extends PlainExtension<YjsOptions> {
     return 'yjs' as const;
   }
 
-  #provider?: YjsRealtimeProvider;
+  private _provider?: YjsRealtimeProvider;
 
   /**
    * The provider that is being used for the editor.
@@ -128,18 +131,23 @@ export class YjsExtension extends PlainExtension<YjsOptions> {
   get provider(): YjsRealtimeProvider {
     const { getProvider } = this.options;
 
-    return (this.#provider ??= getLazyValue(getProvider));
+    return (this._provider ??= getLazyValue(getProvider));
   }
 
   /**
-   * Create the custom undo keymaps for the
+   * Handle the undo keybinding.
    */
-  createKeymap(): PrioritizedKeyBindings {
-    return {
-      'Mod-y': !environment.isMac ? convertCommand(redo) : () => false,
-      'Mod-z': convertCommand(undo),
-      'Shift-Mod-z': convertCommand(redo),
-    };
+  @keyBinding({ key: NamedShortcut.Undo })
+  undoShortcut(parameter: KeyBindingParameter): boolean {
+    return convertCommand(undo)(parameter);
+  }
+
+  /**
+   * Handle the redo keybinding for the editor.
+   */
+  @keyBinding({ key: NamedShortcut.Redo })
+  redoShortcut(parameter: KeyBindingParameter): boolean {
+    return convertCommand(redo)(parameter);
   }
 
   /**
@@ -157,6 +165,7 @@ export class YjsExtension extends PlainExtension<YjsOptions> {
 
     const yDoc = this.provider.doc;
     const type = yDoc.getXmlFragment('prosemirror');
+
     return [
       ySyncPlugin(type, syncPluginOptions),
       yCursorPlugin(
@@ -168,54 +177,54 @@ export class YjsExtension extends PlainExtension<YjsOptions> {
     ];
   }
 
-  createCommands() {
-    return {
-      /**
-       * Undo within a collaborative editor.
-       *
-       * This should be used instead of the built in `undo` command.
-       *
-       * This command does **not** support chaining.
-       */
-      yUndo: (): CommandFunction =>
-        nonChainable((parameter) => {
-          const { state, dispatch } = parameter;
-          const undoManager: UndoManager = yUndoPluginKey.getState(state).undoManager;
+  /**
+   * Undo within a collaborative editor.
+   *
+   * This should be used instead of the built in `undo` command.
+   *
+   * This command does **not** support chaining.
+   */
+  @command({ disableChaining: true })
+  yUndo(): NonChainableCommandFunction {
+    return nonChainable((parameter) => {
+      const { state, dispatch } = parameter;
+      const undoManager: UndoManager = yUndoPluginKey.getState(state).undoManager;
 
-          if (undoManager.undoStack.length === 0) {
-            return false;
-          }
+      if (undoManager.undoStack.length === 0) {
+        return false;
+      }
 
-          if (!dispatch) {
-            return true;
-          }
+      if (!dispatch) {
+        return true;
+      }
 
-          return convertCommand(undo)(parameter);
-        }),
+      return convertCommand(undo)(parameter);
+    });
+  }
 
-      /**
-       * Redo, within a collaborative editor.
-       *
-       * This should be used instead of the built in `redo` command.
-       *
-       * This command does **not** support chaining.
-       */
-      yRedo: (): CommandFunction =>
-        nonChainable((parameter) => {
-          const { state, dispatch } = parameter;
-          const undoManager: UndoManager = yUndoPluginKey.getState(state).undoManager;
+  /**
+   * Redo, within a collaborative editor.
+   *
+   * This should be used instead of the built in `redo` command.
+   *
+   * This command does **not** support chaining.
+   */
+  @command({ disableChaining: true })
+  yRedo(): NonChainableCommandFunction {
+    return nonChainable((parameter) => {
+      const { state, dispatch } = parameter;
+      const undoManager: UndoManager = yUndoPluginKey.getState(state).undoManager;
 
-          if (undoManager.redoStack.length === 0) {
-            return false;
-          }
+      if (undoManager.redoStack.length === 0) {
+        return false;
+      }
 
-          if (!dispatch) {
-            return true;
-          }
+      if (!dispatch) {
+        return true;
+      }
 
-          return convertCommand(redo)(parameter);
-        }),
-    };
+      return convertCommand(redo)(parameter);
+    });
   }
 
   /**
@@ -234,7 +243,7 @@ export class YjsExtension extends PlainExtension<YjsOptions> {
     ]);
 
     if (changes.getProvider.changed) {
-      this.#provider = undefined;
+      this._provider = undefined;
       const previousProvider = getLazyValue(changes.getProvider.previousValue);
 
       // Check whether the values have changed.
@@ -254,12 +263,12 @@ export class YjsExtension extends PlainExtension<YjsOptions> {
    * Remove the provider from the manager.
    */
   onDestroy(): void {
-    if (!this.#provider) {
+    if (!this._provider) {
       return;
     }
 
-    this.options.destroyProvider(this.#provider);
-    this.#provider = undefined;
+    this.options.destroyProvider(this._provider);
+    this._provider = undefined;
   }
 }
 
@@ -276,67 +285,6 @@ export function defaultDestroyProvider(provider: YjsRealtimeProvider): void {
 function getLazyValue<Type>(lazyValue: Type | (() => Type)): Type {
   return isFunction(lazyValue) ? lazyValue() : lazyValue;
 }
-
-/**
- * @remarks
- *
- * This magic property is transformed by babel via linaria into CSS that will be
- * wrapped by the `.remirror-editor` class; when you edit it you must run `yarn
- * fix:css` to regenerate `@remirror/styles/all.css`.
- */
-export const editorStyles = css`
-  .ProseMirror {
-    .ProseMirror-yjs-cursor {
-      position: absolute;
-      border-left: black;
-      border-left-style: solid;
-      border-left-width: 2px;
-      border-color: orange;
-      height: 1em;
-      word-break: normal;
-      pointer-events: none;
-
-      > div {
-        position: relative;
-        top: -1.05em;
-        font-size: 13px;
-        background-color: rgb(250, 129, 0);
-        font-family: serif;
-        font-style: normal;
-        font-weight: normal;
-        line-height: normal;
-        user-select: none;
-        color: white;
-        padding-left: 2px;
-        padding-right: 2px;
-      }
-    }
-
-    > .ProseMirror-yjs-cursor:first-child {
-      margin-top: 16px;
-    }
-
-    p:first-child,
-    h1:first-child,
-    h2:first-child,
-    h3:first-child,
-    h4:first-child,
-    h5:first-child,
-    h6:first-child {
-      margin-top: 16px;
-    }
-  }
-
-  #y-functions {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-
-    > * {
-      display: inline-block;
-    }
-  }
-`;
 
 declare global {
   namespace Remirror {

@@ -1,7 +1,8 @@
 import {
   ApplySchemaAttributes,
+  command,
   CommandFunction,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   FromToParameter,
   InputRule,
@@ -14,6 +15,8 @@ import {
   Static,
   toggleMark,
 } from '@remirror/core';
+
+import { description, label } from './messages';
 
 type FontWeightProperty =
   | '-moz-initial'
@@ -38,7 +41,7 @@ export interface BoldOptions {
  * When added to your editor it will provide the `bold` command which makes the text under the cursor /
  * or at the provided position range bold.
  */
-@extensionDecorator<BoldOptions>({
+@extension<BoldOptions>({
   defaultOptions: { weight: undefined },
   staticKeys: ['weight'],
 })
@@ -47,7 +50,9 @@ export class BoldExtension extends MarkExtension<BoldOptions> {
     return 'bold' as const;
   }
 
-  readonly tags = [ExtensionTag.FormattingMark, ExtensionTag.FontStyle];
+  createTags() {
+    return [ExtensionTag.FormattingMark, ExtensionTag.FontStyle];
+  }
 
   createMarkSpec(extra: ApplySchemaAttributes): MarkExtensionSpec {
     return {
@@ -101,39 +106,43 @@ export class BoldExtension extends MarkExtension<BoldOptions> {
     ];
   }
 
-  createCommands() {
-    return {
-      /**
-       * Toggle the bold styling on and off. Remove the formatting if any
-       * matching bold formatting within the selection or provided range.
-       */
-      toggleBold: (range?: FromToParameter): CommandFunction => {
-        return toggleMark({ type: this.type, range });
-      },
+  /**
+   * Toggle the bold styling on and off. Remove the formatting if any
+   * matching bold formatting within the selection or provided range.
+   */
+  @command({ icon: 'bold', label, description })
+  toggleBold(range?: FromToParameter): CommandFunction {
+    return toggleMark({ type: this.type, range });
+  }
 
-      /**
-       * Set the bold formatting for the provided range.
-       *
-       * TODO add selection support.
-       * TODO add check to see that provided range is valid.
-       */
-      setBold: (range: FromToParameter): CommandFunction => ({ tr, dispatch }) => {
-        dispatch?.(tr.addMark(range?.from, range?.to, this.type.create()));
+  /**
+   * Set the bold formatting for the provided range.
+   */
+  @command()
+  setBold(range?: FromToParameter): CommandFunction {
+    return ({ tr, dispatch }) => {
+      const { from, to } = range ?? tr.selection;
+      dispatch?.(tr.addMark(from, to, this.type.create()));
 
-        return true;
-      },
+      return true;
+    };
+  }
 
-      /**
-       * Remove the bold formatting from the provided range.
-       *
-       * TODO add selection support.
-       * TODO add check that the provided range is valid.
-       */
-      removeBold: (range: FromToParameter): CommandFunction => ({ tr, dispatch }) => {
-        dispatch?.(tr.removeMark(range?.from, range?.to, this.type));
+  /**
+   * Remove the bold formatting from the provided range.
+   */
+  @command()
+  removeBold(range?: FromToParameter): CommandFunction {
+    return ({ tr, dispatch }) => {
+      const { from, to } = range ?? tr.selection;
 
-        return true;
-      },
+      if (!tr.doc.rangeHasMark(from, to, this.type)) {
+        return false;
+      }
+
+      dispatch?.(tr.removeMark(from, to, this.type));
+
+      return true;
     };
   }
 }

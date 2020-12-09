@@ -1,12 +1,12 @@
 import { i18n } from '@lingui/core';
 
-import enLocale from './en';
+import { messages as enMessages } from './en/messages';
 import { en } from './plurals';
 
 i18n.loadLocaleData('en', { plurals: en });
 
 i18n.load({
-  en: enLocale.messages,
+  en: enMessages,
 });
 
 export type {

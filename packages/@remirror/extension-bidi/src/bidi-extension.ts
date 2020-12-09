@@ -1,7 +1,7 @@
 import direction from 'direction';
 
 import type {
-  CreatePluginReturn,
+  CreateExtensionPlugin,
   IdentifierSchemaAttributes,
   NodeAttributes,
   OnSetOptionsParameter,
@@ -10,7 +10,7 @@ import type {
 } from '@remirror/core';
 import {
   bool,
-  extensionDecorator,
+  extension,
   findParentNode,
   hasTransactionChanged,
   isString,
@@ -42,7 +42,7 @@ export interface BidiOptions {
  * An extension which adds bi-directional text support to your editor. This is
  * the best way to support languages which are read from right-to-left.
  */
-@extensionDecorator<BidiOptions>({
+@extension<BidiOptions>({
   defaultOptions: { defaultDirection: null, autoUpdate: true, excludeNodes: [] },
   staticKeys: ['excludeNodes'],
 })
@@ -84,7 +84,7 @@ export class BidiExtension extends PlainExtension<BidiOptions> {
    * Create the plugin that ensures the node has the correct `dir` value on each
    * state update.
    */
-  createPlugin(): CreatePluginReturn<boolean> {
+  createPlugin(): CreateExtensionPlugin<boolean> {
     return {
       state: {
         init: () => false,

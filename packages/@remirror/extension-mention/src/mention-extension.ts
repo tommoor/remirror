@@ -3,7 +3,7 @@ import {
   bool,
   CommandFunction,
   ErrorConstant,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   FromToParameter,
   GetMarkRange,
@@ -20,10 +20,8 @@ import {
   MarkAttributes,
   MarkExtension,
   MarkExtensionSpec,
-  markPasteRule,
   pick,
   ProsemirrorAttributes,
-  ProsemirrorPlugin,
   RangeParameter,
   removeMark,
   replaceText,
@@ -31,6 +29,7 @@ import {
   Static,
 } from '@remirror/core';
 import type { CreateEventHandlers } from '@remirror/extension-events';
+import { MarkPasteRule } from '@remirror/pm/paste-rules';
 import {
   createRegexFromSuggester,
   DEFAULT_SUGGESTER,
@@ -142,7 +141,7 @@ export interface MentionOptions
  *   suggested.
  * - Decorations for in-progress mentions
  */
-@extensionDecorator<MentionOptions>({
+@extension<MentionOptions>({
   defaultOptions: {
     mentionTag: 'a' as const,
     matchers: [],
@@ -168,7 +167,9 @@ export class MentionExtension extends MarkExtension<MentionOptions> {
   /**
    * Tag this as a behavior influencing mark.
    */
-  readonly tags = [ExtensionTag.Behavior, ExtensionTag.ExcludeInputRules];
+  createTags() {
+    return [ExtensionTag.Behavior, ExtensionTag.ExcludeInputRules];
+  }
 
   createMarkSpec(extra: ApplySchemaAttributes): MarkExtensionSpec {
     const dataAttributeId = 'data-mention-id';
@@ -398,7 +399,7 @@ export class MentionExtension extends MarkExtension<MentionOptions> {
    *
    * It creates regex tests for each of the configured matchers.
    */
-  createPasteRules(): ProsemirrorPlugin[] {
+  createPasteRules(): MarkPasteRule[] {
     return this.options.matchers.map((matcher) => {
       const { startOfLine, char, supportedCharacters, name, matchOffset } = {
         ...DEFAULT_MATCHER,
@@ -420,15 +421,16 @@ export class MentionExtension extends MarkExtension<MentionOptions> {
         'g',
       );
 
-      return markPasteRule({
+      return {
+        type: 'mark',
         regexp,
-        type: this.type,
+        markType: this.type,
         getAttributes: (string) => ({
           id: getMatchString(string.slice(string[2].length, string.length)),
           label: getMatchString(string),
           name,
         }),
-      });
+      };
     });
   }
 

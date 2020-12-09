@@ -1,19 +1,21 @@
 import { ErrorConstant, ExtensionPriority } from '@remirror/core-constants';
-import { entries, object } from '@remirror/core-helpers';
-import type { AnyFunction, EmptyShape, ProsemirrorAttributes, Value } from '@remirror/core-types';
+import { entries, isEmptyObject, object } from '@remirror/core-helpers';
+import type { AnyFunction, EmptyShape, ProsemirrorAttributes, Shape } from '@remirror/core-types';
 import { isMarkActive, isNodeActive, isSelectionEmpty } from '@remirror/core-utils';
 
-import { extensionDecorator } from '../decorators';
 import {
+  ActiveFromExtensions,
   AnyExtension,
+  extension,
+  Helper,
   HelpersFromExtensions,
   isMarkExtension,
   isNodeExtension,
   PlainExtension,
 } from '../extension';
 import { throwIfNameNotUnique } from '../helpers';
-import type { ActiveFromCombined, AnyCombinedUnion, HelpersFromCombined } from '../preset';
 import type { ExtensionHelperReturn } from '../types';
+import { helper, HelperDecoratorOptions } from './decorators';
 
 /**
  * Helpers are custom methods that can provide extra functionality to the
@@ -26,9 +28,9 @@ import type { ExtensionHelperReturn } from '../types';
  *
  * Also provides the default helpers used within the extension.
  *
- * @builtin
+ * @category Builtin Extension
  */
-@extensionDecorator({ defaultPriority: ExtensionPriority.High })
+@extension({})
 export class HelpersExtension extends PlainExtension {
   get name() {
     return 'helpers' as const;
@@ -56,11 +58,15 @@ export class HelpersExtension extends PlainExtension {
         };
       }
 
-      if (!extension.createHelpers) {
-        continue;
+      const extensionHelpers = extension.createHelpers?.() ?? {};
+
+      for (const helperName of Object.keys(extension.decoratedHelpers ?? {})) {
+        extensionHelpers[helperName] = (extension as Shape)[helperName].bind(extension);
       }
 
-      const extensionHelpers = extension.createHelpers();
+      if (isEmptyObject(extensionHelpers)) {
+        continue;
+      }
 
       for (const [name, helper] of entries(extensionHelpers)) {
         throwIfNameNotUnique({ name, set: names, code: ErrorConstant.DUPLICATE_HELPER_NAMES });
@@ -73,23 +79,22 @@ export class HelpersExtension extends PlainExtension {
     this.store.setExtensionStore('helpers', helpers as any);
   }
 
-  createHelpers() {
-    return {
-      /**
-       * Check whether the selection is empty.
-       */
-      isSelectionEmpty: () => isSelectionEmpty(this.store.view.state),
-    };
+  /**
+   * Check whether the selection is empty.
+   */
+  @helper()
+  isSelectionEmpty(): Helper<boolean> {
+    return isSelectionEmpty(this.store.view.state);
   }
 }
 
 declare global {
   namespace Remirror {
-    interface ManagerStore<Combined extends AnyCombinedUnion> {
+    interface ManagerStore<ExtensionUnion extends AnyExtension> {
       /**
        * The helpers provided by the extensions used.
        */
-      helpers: HelpersFromCombined<Combined | Value<AllExtensions>>;
+      helpers: HelpersFromExtensions<ExtensionUnion>;
 
       /**
        * Check which nodes and marks are active under the current user
@@ -101,20 +106,32 @@ declare global {
        * return active.bold() ? 'bold' : 'regular';
        * ```
        */
-      active: ActiveFromCombined<Combined>;
+      active: ActiveFromExtensions<ExtensionUnion>;
     }
 
-    interface ExtensionCreatorMethods {
+    interface BaseExtension {
       /**
        * `ExtensionHelpers`
        *
        * This pseudo property makes it easier to infer Generic types of this
        * class.
-       * @private
+       *
+       * @internal
        */
       ['~H']: this['createHelpers'] extends AnyFunction
         ? ReturnType<this['createHelpers']>
         : EmptyShape;
+
+      /**
+       * @experimental
+       *
+       * Stores all the helpers that have been added via decorators to the
+       * extension instance. This is used by the `HelpersExtension` to pick the
+       * helpers.
+       *
+       * @internal
+       */
+      decoratedHelpers?: Record<string, HelperDecoratorOptions>;
 
       /**
        * A helper method is a function that takes in arguments and returns a
@@ -142,10 +159,10 @@ declare global {
        *
        * ```
        * // app.tsx
-       * import { useRemirror } from '@remirror/react';
+       * import { useRemirrorContext } from 'remirror/react';
        *
        * const MyEditor = () => {
-       *   const { helpers } = useRemirror({ autoUpdate: true });
+       *   const { helpers } = useRemirrorContext({ autoUpdate: true });
        *
        *   return helpers.beautiful.checkBeautyLevel() > 50
        *     ? (<span>😍</span>)
@@ -164,7 +181,7 @@ declare global {
        * This should only be accessed after the `onView` lifecycle method
        * otherwise it will throw an error.
        */
-      helpers: HelpersFromExtensions<Builtin | AnyExtension>;
+      helpers: HelpersFromExtensions<AllExtensionUnion>;
     }
 
     interface AllExtensions {

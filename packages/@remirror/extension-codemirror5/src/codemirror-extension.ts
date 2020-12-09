@@ -1,8 +1,10 @@
+import type CodeMirror from 'codemirror';
+
 import {
   ApplySchemaAttributes,
   CommandFunction,
   EditorView,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   isElementDomNode,
   NodeExtension,
@@ -14,13 +16,16 @@ import {
 } from '@remirror/core';
 
 import { CodeMirrorNodeView } from './codemirror-node-view';
+import ref from './codemirror-ref';
 import type { CodeMirrorExtensionAttributes, CodeMirrorExtensionOptions } from './codemirror-types';
 import { arrowHandler, parseLanguageToMode, updateNodeAttributes } from './codemirror-utils';
 
-@extensionDecorator<CodeMirrorExtensionOptions>({
+@extension<CodeMirrorExtensionOptions>({
   defaultOptions: {
+    CodeMirror: ref.CodeMirror,
     defaultCodeMirrorConfig: null,
   },
+  staticKeys: ['CodeMirror'],
 })
 export class CodeMirrorExtension extends NodeExtension<CodeMirrorExtensionOptions> {
   get name() {
@@ -28,6 +33,13 @@ export class CodeMirrorExtension extends NodeExtension<CodeMirrorExtensionOption
   }
 
   readonly tags = [ExtensionTag.BlockNode, ExtensionTag.Code];
+
+  init(): void {
+    // Update the reference to the codemirror instance.
+    if (this.options.CodeMirror) {
+      ref.CodeMirror = this.options.CodeMirror;
+    }
+  }
 
   createNodeSpec(extra: ApplySchemaAttributes): NodeExtensionSpec {
     return {

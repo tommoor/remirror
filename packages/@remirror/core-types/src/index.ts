@@ -115,6 +115,10 @@ export type {
   UnknownShape,
   Value,
   Writeable,
+  ConditionalReturnKeys,
+  ConditionalReturnPick,
+  GetPath,
+  GetPathValue,
 } from './base-types';
 export type {
   AnchorHeadParameter,
@@ -125,7 +129,7 @@ export type {
   KeyBindingCommandFunction,
   KeyBindings,
   MarkExtensionSpec,
-  NextParameter,
+  KeyBindingParameter,
   NodeExtensionSpec,
   NodeViewMethod,
   PrimitiveSelection,

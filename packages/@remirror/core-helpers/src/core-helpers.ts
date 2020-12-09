@@ -1,14 +1,18 @@
+import { get as getPath } from '@ngard/tiny-get';
 import deepmerge from 'deepmerge';
 import fastDeepEqual from 'fast-deep-equal';
+import { BaseError } from 'make-error';
 import omit from 'object.omit';
 import pick from 'object.pick';
-import type { Primitive } from 'type-fest';
+import type { ConditionalExcept, Primitive } from 'type-fest';
 
 import type { RemirrorIdentifier } from '@remirror/core-constants';
 import { __INTERNAL_REMIRROR_IDENTIFIER_KEY__ } from '@remirror/core-constants';
 import type {
   AnyConstructor,
   AnyFunction,
+  GetPath,
+  GetPathValue,
   Nullable,
   Predicate,
   RemirrorIdentifierShape,
@@ -28,6 +32,35 @@ type Falsy = false | 0 | '' | null | undefined;
  */
 export function Cast<Type = any>(parameter: unknown): Type {
   return parameter as Type;
+}
+
+/**
+ * Get the key from a given value. Throw an error if the referenced property is
+ * `undefined`.
+ */
+export function assertGet<Value extends object, Key extends keyof Value>(
+  value: Value,
+  key: Key,
+  message?: string,
+): Value[Key] {
+  const prop = value[key];
+  assert(!isUndefined(prop), message);
+
+  return prop;
+}
+
+/**
+ * Assert the value is `truthy`. Good for defensive programming, especially
+ * after enabling `noUncheckedIndexedAccess` in the tsconfig `compilerOptions`.
+ */
+export function assert(testValue: unknown, message?: string): asserts testValue {
+  if (!testValue) {
+    throw new AssertionError(message);
+  }
+}
+
+class AssertionError extends BaseError {
+  name = 'AssertionError';
 }
 
 /**
@@ -431,8 +464,18 @@ export const isArray = Array.isArray;
  * @param value - the value to check
  *
  */
-export function isEmptyArray(value: unknown): boolean {
+export function isEmptyArray<Item>(value: unknown): value is never[] {
   return isArray(value) && value.length === 0;
+}
+
+/**
+ * Predicate check that value is a non-empty.
+ *
+ * @param value - the value to check
+ *
+ */
+export function isNonEmptyArray<Item>(value: Item[]): value is [Item, ...Item[]] {
+  return isArray(value) && value.length >= 1;
 }
 
 /**
@@ -558,7 +601,7 @@ export function cleanupOS(os: string, pattern?: string, label?: string): string 
       .replace(/\bx86\.64\b/gi, 'x86_64')
       .replace(/\b(Windows Phone) OS\b/, '$1')
       .replace(/\b(Chrome OS \w+) [\d.]+\b/, '$1')
-      .split(' on ')[0],
+      .split(' on ')[0] ?? '',
   );
 }
 
@@ -574,7 +617,7 @@ export function isAndroidOS(): boolean {
     return false;
   }
 
-  return cleanupOS(match[0], 'Android', 'Android').includes('Android');
+  return cleanupOS(match[0] ?? '', 'Android', 'Android').includes('Android');
 }
 
 /**
@@ -659,8 +702,13 @@ export function take<Type>(array: Type[], number: number): Type[] {
   return array.slice(0, number);
 }
 
-export function omitUndefined(object: UnknownShape): UnknownShape {
-  return omit(object, (value) => !isUndefined(value));
+/**
+ * Remove the undefined values from an object.
+ */
+export function omitUndefined<Type extends object>(
+  object: Type,
+): ConditionalExcept<Type, undefined> {
+  return omit(object, (value) => !isUndefined(value)) as any;
 }
 
 /**
@@ -742,7 +790,7 @@ export function noop(): void {}
  * To completely remove a key you can use the `Merge` helper class which
  * replaces it's key with a completely new object
  */
-export function deepMerge<Type = any>(...objects: Array<UnknownShape | unknown[]>): Type {
+export function deepMerge<Type = any>(...objects: Array<object | unknown[]>): Type {
   return deepmerge.all<Type>(objects as any, { isMergeableObject: isPlainObject });
 }
 
@@ -767,7 +815,7 @@ export function clamp({ min, max, value }: ClampParameter): number {
  * Get the last element of the array.
  */
 export function last<Type>(array: Type[]): Type {
-  return array[array.length - 1];
+  return array[array.length - 1] as Type;
 }
 
 /**
@@ -794,31 +842,15 @@ export function sort<Type>(array: Type[], compareFn: (a: Type, z: Type) => numbe
 /**
  * Get a property from an object or array by a string path or an array path.
  *
- * @param path - path to property
  * @param obj - object to retrieve property from
+ * @param path - path to property
  */
-export function get<Return = any>(
-  path: string | Array<string | number>,
-  obj: unknown,
-  fallback?: unknown,
-): Return {
-  if (!path || isEmptyArray(path)) {
-    return (isUndefined(obj) ? fallback : obj) as Return;
-  }
-
-  if (isString(path)) {
-    path = path.split('.');
-  }
-
-  for (let ii = 0, length_ = path.length; ii < length_ && obj; ++ii) {
-    if (!isPlainObject(obj) && !isArray(obj)) {
-      return fallback as Return;
-    }
-
-    obj = (obj as any)[path[ii]];
-  }
-
-  return (isUndefined(obj) ? fallback : obj) as Return;
+export function get<Type, Path extends GetPath<Type>, Default = undefined>(
+  value: Type,
+  path: Path,
+  fallback?: Default,
+): GetPathValue<Type, Path> | Default {
+  return getPath(value, path as string, fallback);
 }
 
 function setPropInternal<Type extends object = any>(
@@ -835,6 +867,8 @@ function setPropInternal<Type extends object = any>(
   obj = obj || {};
 
   const key = path[index];
+
+  assert(key);
   return setClone(obj, key, setPropInternal(path, obj[key], value, ++index));
 }
 
@@ -902,9 +936,9 @@ export function unset(path: Array<string | number>, target: Shape): Shape {
   return clonedObject;
 }
 
-function makeFunctionForUniqueBy<Item = any, Key = any>(value: string | Array<string | number>) {
+function makeFunctionForUniqueBy<Item = any>(value: GetPath<Item>) {
   return (item: Item) => {
-    return get<Key>(value, item);
+    return get(item, value);
   };
 }
 
@@ -927,13 +961,13 @@ function makeFunctionForUniqueBy<Item = any, Key = any>(value: string | Array<st
  * // Same as above
  * ```
  */
-export function uniqueBy<Item = any, Key = any>(
+export function uniqueBy<Item = any>(
   array: Item[],
-  getValue: ((item: Item) => Key) | string | Array<string | number>,
+  getValue: ((item: Item) => unknown) | GetPath<Item>,
   fromStart = false,
 ): Item[] {
   const unique: Item[] = [];
-  const found: Set<Key> = new Set();
+  const found: Set<unknown> = new Set();
 
   const getter = isFunction(getValue) ? getValue : makeFunctionForUniqueBy(getValue);
   const list = fromStart ? [...array].reverse() : array;
@@ -990,8 +1024,8 @@ export function within(value: number, ...rest: Array<number | undefined | null>)
  * @param obj - the object to check
  * @param key - the property to check
  *
- * @typeParam Obj - the object type
- * @typeParam Property - the property which can be a string | number | symbol
+ * @template Obj - the object type
+ * @template Property - the property which can be a string | number | symbol
  */
 export function hasOwnProperty<Obj extends object, Property extends string | number | symbol>(
   object_: Obj,

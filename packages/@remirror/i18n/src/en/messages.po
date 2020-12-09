@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"POT-Creation-Date: 2020-06-03 09:38+0100\n"
+"POT-Creation-Date: 2020-12-07 04:55+0000\n"
 "Mime-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -13,7 +13,82 @@ msgstr ""
 "Language-Team: \n"
 "Plural-Forms: \n"
 
-#. The alt text for the user mention avatar.
-#: packages/@remirror/react-social/src/social-messages.ts:2
-msgid "user.mention.avatar.alt"
-msgstr "Avatar for { name }"
+#. The label for the bold menu button.
+#: packages/@remirror/react-components/src/messages.ts:7
+msgid "components.bold.menu.icon.label"
+msgstr "Bold"
+
+#. The label for the h1 menu button.
+#: packages/@remirror/react-components/src/messages.ts:22
+msgid "components.h1.menu.icon.label"
+msgstr "Heading 1"
+
+#. The label for the h2 menu button.
+#: packages/@remirror/react-components/src/messages.ts:27
+msgid "components.h2.menu.icon.label"
+msgstr "Heading 2"
+
+#. The label for the h3 menu button.
+#: packages/@remirror/react-components/src/messages.ts:32
+msgid "components.h3.menu.icon.label"
+msgstr "Heading 3"
+
+#. The image description label.
+#: packages/@remirror/react-components/src/messages.ts:52
+msgid "components.image.dialog.description.label"
+msgstr "Image description"
+
+#. A placeholder for the description of the image that is being inserted.
+#: packages/@remirror/react-components/src/messages.ts:57
+msgid "components.image.dialog.description.placeholder"
+msgstr "Add a short description here."
+
+#. The label for the image menu button.
+#: packages/@remirror/react-components/src/messages.ts:42
+msgid "components.image.dialog.label"
+msgstr "Image"
+
+#. The label for the image url.
+#: packages/@remirror/react-components/src/messages.ts:47
+msgid "components.image.dialog.source.label"
+msgstr "Image source"
+
+#. The label for the image menu button.
+#: packages/@remirror/react-components/src/messages.ts:37
+msgid "components.image.menu.icon.label"
+msgstr "Image"
+
+#. The label for the italic menu button.
+#: packages/@remirror/react-components/src/messages.ts:12
+msgid "components.italic.menu.icon.label"
+msgstr "Italic"
+
+#. The aria label for the static menu.
+#: packages/@remirror/react-components/src/messages.ts:2
+msgid "components.static-menu.label"
+msgstr "Static Menu"
+
+#. The label for the underline menu button.
+#: packages/@remirror/react-components/src/messages.ts:17
+msgid "components.underline.menu.icon.label"
+msgstr "Underline"
+
+#. The label to use for toggling the bold formatting
+#: packages/@remirror/extension-bold/src/messages.ts:10
+msgid "extension.command.toggle-bold.description"
+msgstr "Toggle between bold text."
+
+#. The label to use for toggling the bold formatting
+#: packages/@remirror/extension-bold/src/messages.ts:4
+msgid "extension.command.toggle-bold.label"
+msgstr "{activeString, select, true {Set Bold} false {Remove Bold}}"
+
+#. Description of the toggle heading command
+#: packages/@remirror/extension-heading/src/messages.ts:12
+msgid "extension.command.toggle-heading.description"
+msgstr "{0, select, true {Remove Heading {1}} false {Activate Heading {2}}}"
+
+#. Label for the toggle heading command
+#: packages/@remirror/extension-heading/src/messages.ts:4
+msgid "extension.command.toggle-heading.label"
+msgstr "Heading {0}"

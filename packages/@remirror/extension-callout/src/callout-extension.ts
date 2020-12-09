@@ -1,7 +1,7 @@
 import {
   ApplySchemaAttributes,
   CommandFunction,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   findNodeAtSelection,
   isElementDomNode,
@@ -19,7 +19,7 @@ import { dataAttributeType, updateNodeAttributes } from './callout-utils';
 /**
  * Adds a callout to the editor.
  */
-@extensionDecorator<CalloutOptions>({
+@extension<CalloutOptions>({
   defaultOptions: {
     defaultType: 'info',
   },

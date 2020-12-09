@@ -9,21 +9,20 @@ import { useExtension } from '@remirror/react';
  * @remarks
  *
  * ```tsx
- * import { useKeymap } from 'remirror/react/hooks/use-keymap';
- * import { RemirrorProvider, useRemirror, useManager } from 'remirror/react';
+ * import { Remirror, useRemirror, useRemirrorContext, useKeymap  } from 'remirror/react';
  *
- * const Wrapper = () => {
- *   const manager = useManager(() => []);
+ * const Editor = () => {
+ *   const { manager } = useRemirror({ extensions: () => [] });
  *
  *   return (
- *     <RemirrorProvider manager={manager}>
- *       <Editor />
- *     </RemirrorProvider>
+ *     <Remirror manager={manager}>
+ *       <EditorBindings />
+ *     </Remirror>
  *   );
  * };
  *
- * const Editor = () => {
- *   const { getRootProps } = useRemirror({ autoUpdate: true });
+ * const EditorBindings = () => {
+ *   const { getRootProps } = useRemirrorContext({ autoUpdate: true });
  *
  *   useKeyBindings({
  *     Enter: () => {

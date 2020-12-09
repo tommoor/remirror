@@ -1,7 +1,9 @@
 import {
   ApplySchemaAttributes,
+  command,
   CommandFunction,
-  extensionDecorator,
+  CoreIcon,
+  extension,
   ExtensionTag,
   InputRule,
   KeyBindings,
@@ -15,12 +17,15 @@ import {
   toggleBlockItem,
 } from '@remirror/core';
 import { textblockTypeInputRule } from '@remirror/pm/inputrules';
+import { NodePasteRule } from '@remirror/pm/paste-rules';
+
+import { description, label } from './messages';
 
 export interface HeadingOptions {
   /**
    * The numerical value of the supporting headings.
    *
-   * @default [1, 2, 3, 4, 5, 6]
+   * @default `[1, 2, 3, 4, 5, 6]`
    */
   levels?: Static<number[]>;
 
@@ -41,7 +46,7 @@ export type HeadingExtensionAttributes = ProsemirrorAttributes<{
 
 export interface HeadingOptions {}
 
-@extensionDecorator<HeadingOptions>({
+@extension<HeadingOptions>({
   defaultOptions: {
     levels: [1, 2, 3, 4, 5, 6],
     defaultLevel: 1,
@@ -53,19 +58,21 @@ export class HeadingExtension extends NodeExtension<HeadingOptions> {
     return 'heading' as const;
   }
 
-  readonly tags = [ExtensionTag.BlockNode];
+  createTags() {
+    return [ExtensionTag.BlockNode];
+  }
 
   createNodeSpec(extra: ApplySchemaAttributes): NodeExtensionSpec {
     return {
+      content: 'inline*',
+      defining: true,
+      draggable: false,
       attrs: {
         ...extra.defaults(),
         level: {
           default: this.options.defaultLevel,
         },
       },
-      content: 'inline*',
-      defining: true,
-      draggable: false,
       parseDOM: this.options.levels.map((level) => ({
         tag: `h${level}`,
         getAttrs: (element) => ({ ...extra.parse(element), level }),
@@ -81,19 +88,17 @@ export class HeadingExtension extends NodeExtension<HeadingOptions> {
     };
   }
 
-  createCommands() {
-    return {
-      /**
-       * Toggle the heading for the current block. If you don't provide the
-       * level it will use the options.defaultLevel.
-       */
-      toggleHeading: (attrs: HeadingExtensionAttributes = {}): CommandFunction =>
-        toggleBlockItem({
-          type: this.type,
-          toggleType: this.store.schema.nodes.paragraph,
-          attrs,
-        }),
-    };
+  /**
+   * Toggle the heading for the current block. If you don't provide the
+   * level it will use the options.defaultLevel.
+   */
+  @command({ icon: ({ attrs }) => `h${attrs.level ?? '1'}` as CoreIcon, description, label })
+  toggleHeading(attrs: HeadingExtensionAttributes = {}): CommandFunction {
+    return toggleBlockItem({
+      type: this.type,
+      toggleType: 'paragraph',
+      attrs,
+    });
   }
 
   createKeymap(): KeyBindings {
@@ -109,6 +114,16 @@ export class HeadingExtension extends NodeExtension<HeadingOptions> {
     return this.options.levels.map((level) =>
       textblockTypeInputRule(new RegExp(`^(#{1,${level}})\\s$`), this.type, () => ({ level })),
     );
+  }
+
+  createPasteRules(): NodePasteRule[] {
+    return this.options.levels.map((level) => ({
+      type: 'node',
+      nodeType: this.type,
+      regexp: new RegExp(`^#{1,${level}}\\s([\\s\\w]+)$`),
+      getAttributes: () => ({ level }),
+      startOfTextBlock: true,
+    }));
   }
 }
 

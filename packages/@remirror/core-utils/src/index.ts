@@ -1,5 +1,11 @@
-export { nonChainable, convertCommand, chainableEditorState, chainCommands } from '@remirror/pm';
+export { chainableEditorState, chainCommands, convertCommand, nonChainable } from '@remirror/pm';
 
+export type {
+  RemoveMarkParameter,
+  ReplaceTextParameter,
+  ToggleBlockItemParameter,
+  UpdateMarkParameter,
+} from './command-utils';
 export {
   isChrome,
   lift,
@@ -12,26 +18,31 @@ export {
   updateMark,
   wrapIn,
 } from './command-utils';
-
 export type {
   CreateDocumentNodeParameter,
   GetMarkRange,
+  CustomDocumentParameter,
   InvalidContentBlock,
   InvalidContentHandler,
   InvalidContentHandlerParameter,
+  NamedStringHandlers,
   StringHandler,
+  StringHandlerOptions,
   StringHandlerParameter,
 } from './core-utils';
 export {
+  getDocRange,
+  textBetween,
   areSchemasCompatible,
-  isEmptyBlockNode,
+  areStatesEqual,
   atDocEnd,
   atDocStart,
   canInsertNode,
   closestElement,
   createDocumentNode,
   endPositionOfParent,
-  fromHtml,
+  getChangedNodeRanges,
+  getChangedRanges,
   getCursor,
   getDocument,
   getInvalidContent,
@@ -44,6 +55,7 @@ export {
   getSelectedWord,
   getTextContentFromSlice,
   getTextSelection,
+  htmlToProsemirrorNode,
   isAllSelection,
   isDocNode,
   isDocNodeEmpty,
@@ -51,6 +63,7 @@ export {
   isEditorSchema,
   isEditorState,
   isElementDomNode,
+  isEmptyBlockNode,
   isMarkActive,
   isMarkType,
   isNodeSelection,
@@ -60,21 +73,16 @@ export {
   isRemirrorJSON,
   isResolvedPos,
   isSelection,
-  areStatesEqual,
   isTextDomNode,
   isTextSelection,
   isTransaction,
+  prosemirrorNodeToDom,
+  prosemirrorNodeToHtml,
   shouldUseDomEnvironment,
   startPositionOfParent,
   omitExtraAttributes,
-  toDom,
-  toHtml,
-  getChangedRanges,
-  getChangedNodeRanges,
 } from './core-utils';
-
 export { environment } from './environment';
-
 export type { ModifierKeys } from './keyboard-utils';
 export {
   ALT,
@@ -87,7 +95,6 @@ export {
   SHIFT,
   WINDOWS,
 } from './keyboard-utils';
-
 export type { NodeWithPosition } from './prosemirror-node-utils';
 export {
   containsNodesOfType,
@@ -100,14 +107,12 @@ export {
   findTextNodes,
   getChangedNodes,
 } from './prosemirror-node-utils';
-
 export type {
   ShouldSkipFunction,
-  SkippableInputRule,
   ShouldSkipParameter,
+  SkippableInputRule,
 } from './prosemirror-rules';
-export { markInputRule, markPasteRule, nodeInputRule, plainInputRule } from './prosemirror-rules';
-
+export { markInputRule, nodeInputRule, plainInputRule } from './prosemirror-rules';
 export type {
   FindProsemirrorNodeResult,
   FindSelectedNodeOfType,

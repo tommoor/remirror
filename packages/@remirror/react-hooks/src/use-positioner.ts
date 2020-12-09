@@ -34,9 +34,9 @@ import { useMultiPositioner, UsePositionerReturn } from './use-multi-positioner'
  * }
  *
  * const Wrapper = () => (
- *   <RemirrorProvider extensions={[]}>
+ *   <Remirror extensions={[]}>
  *     <MenuComponent />
- *   </RemirrorProvider>
+ *   </Remirror>
  * )
  * ```
  */

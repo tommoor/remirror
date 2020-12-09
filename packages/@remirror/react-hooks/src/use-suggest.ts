@@ -3,10 +3,10 @@ import type { Except } from 'type-fest';
 
 import {
   AnyExtension,
-  AnyPreset,
   BuiltinPreset,
   omit,
   RemirrorEventListener,
+  SuggestExtension,
 } from '@remirror/core';
 import { hasStateChanged } from '@remirror/extension-positioner';
 import type {
@@ -17,7 +17,7 @@ import type {
   Suggester,
   SuggestState,
 } from '@remirror/pm/suggest';
-import { usePreset, useRemirror } from '@remirror/react';
+import { useExtension, useRemirrorContext } from '@remirror/react';
 
 /**
  * This hook allows you to dynamically create a suggester which can respond to
@@ -41,7 +41,7 @@ import { usePreset, useRemirror } from '@remirror/react';
  * The cursor has exited and entered (changed) at the same time.
  */
 export function useSuggester(props: UseSuggesterProps): UseSuggesterReturn {
-  const { helpers } = useRemirror<BuiltinPreset>();
+  const { helpers } = useRemirrorContext<BuiltinPreset>();
 
   const [hookState, setHookState] = useState<UseSuggesterState>(() => ({
     change: undefined,
@@ -72,7 +72,7 @@ export function useSuggester(props: UseSuggesterProps): UseSuggesterReturn {
 
   // This change handler will be called on every editor state update. It keeps
   // the state for the suggester that has been added correct.
-  const onStateUpdate: RemirrorEventListener<AnyExtension | AnyPreset> = useCallback(
+  const onStateUpdate: RemirrorEventListener<AnyExtension> = useCallback(
     (parameter) => {
       const { tr, state, previousState } = parameter;
 
@@ -113,11 +113,11 @@ export function useSuggester(props: UseSuggesterProps): UseSuggesterReturn {
   );
 
   // Attach the editor state handler to the instance of the remirror editor.
-  useRemirror(onStateUpdate);
+  useRemirrorContext(onStateUpdate);
 
   // Add the suggester to the editor via the BuiltinPreset.
-  usePreset(
-    BuiltinPreset,
+  useExtension(
+    SuggestExtension,
     useCallback(({ addCustomHandler }) => addCustomHandler('suggester', { ...props, onChange }), [
       onChange,
       props,

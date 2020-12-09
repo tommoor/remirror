@@ -11,6 +11,7 @@ import type {
   GetDynamic,
   GetFixedDynamic,
   GetPartialDynamic,
+  ProsemirrorCommandFunction,
   Transaction,
   ValidOptions,
 } from '@remirror/core-types';
@@ -56,19 +57,9 @@ export type ChangedOptions<Options extends ValidOptions> = {
 export type GetOptions<Type extends { ['~O']: unknown }> = Type['~O'];
 
 /**
- * Get the schema from a `RemirrorManager`.
- */
-export type GetSchema<Type extends { ['~Sch']: unknown }> = Type['~Sch'];
-
-/**
  * Get the commands from a `RemirrorManager`, `Extension` or `Preset`.
  */
 export type GetCommands<Type extends { ['~C']: unknown }> = Type['~C'];
-
-/**
- * Get the Extensions from a `RemirrorManager`, or `Preset`.
- */
-export type GetExtensions<Type extends { ['~E']: unknown }> = Type['~E'];
 
 /**
  * Get the helpers provided by an from a `RemirrorManager`, `Extension` or
@@ -136,15 +127,58 @@ export interface CommandShape<Parameter extends any[] = []> {
    *
    * @remarks
    *
-   * Some commands can have rules and restrictions. For example you may want to
-   * disable styling making text bold when within a codeBlock. In that case
-   * isEnabled would be false when within the codeBlock and true when outside.
+   * Some commands can have rules and restrictions. For example, formatting like
+   *`bold` is disabled within a `codeBlock`. In this case
+   *`commands.toggleBold.isEnabled()` returns `false` when within a `codeBlock`
+   *and `true` when outside.
    *
    * @param args - The same arguments that are applied to the command function.
    */
   isEnabled: (...args: Parameter) => boolean;
 
+  /**
+   * This function gives you access to the original command defined by the
+   * extension in your editor exactly as it was defined.
+   *
+   * The function returns a function that takes the CommandFunctionParameter of
+   * `{ state, dispatch?, tr, view? }` object.
+   *
+   * ```ts
+   * function command(...args: any[]) => CommandFunction;
+   * ```
+   */
+  original: (...args: Parameter) => CommandFunction;
+
   (...args: Parameter): void;
+}
+
+export interface ApplyStateLifecycleParameter extends EditorStateParameter {
+  /**
+   * The original transaction which caused this state update.
+   */
+  tr: Transaction;
+
+  /**
+   * The previous state.
+   */
+  previousState: EditorState;
+}
+
+export interface AppendLifecycleParameter extends EditorStateParameter {
+  /**
+   * Update this transaction in order to append.
+   */
+  tr: Transaction;
+
+  /**
+   * The previous state.
+   */
+  previousState: EditorState;
+
+  /**
+   * The transactions that have already been applied.
+   */
+  transactions: Transaction[];
 }
 
 export interface StateUpdateLifecycleParameter extends EditorStateParameter {
@@ -297,5 +331,17 @@ declare global {
 /**
  * An interface for creating custom plugins in your `remirror` editor.
  */
-export interface CreatePluginReturn<PluginState = any>
+export interface CreateExtensionPlugin<PluginState = any>
   extends Except<PluginSpec<PluginState, EditorSchema>, 'key'> {}
+
+/**
+ * A helper interface for creating strongly typed decorators.
+ */
+export interface TypedPropertyDescriptor<Type> {
+  configurable?: boolean;
+  enumerable?: boolean;
+  value?: Type;
+  writable?: boolean;
+  get?: () => Type;
+  set?: (v: Type) => void;
+}

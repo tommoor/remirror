@@ -1,11 +1,11 @@
-import React, { FC, useEffect } from 'react';
-import { LinkExtension, LinkOptions } from 'remirror/extension/link';
-import { RemirrorProvider, useManager, useRemirror } from 'remirror/react';
+import { FC, useEffect } from 'react';
+import { LinkExtension, LinkOptions } from 'remirror/extensions';
+import { Remirror, useRemirror, useRemirrorContext } from 'remirror/react';
 
 export default { title: 'Link extension' };
 
 const SmallEditor: FC = () => {
-  const { getRootProps, setContent, commands } = useRemirror();
+  const { getRootProps, setContent, commands } = useRemirrorContext();
 
   useEffect(() => {
     setContent({
@@ -35,15 +35,16 @@ const SmallEditor: FC = () => {
   return <div {...getRootProps()} />;
 };
 
-export const Basic = (args: LinkOptions) => {
-  const extensionManager = useManager([new LinkExtension(args)]);
+export const Basic = (args: LinkOptions): JSX.Element => {
+  const { manager, state } = useRemirror({ extensions: () => [new LinkExtension(args)] });
 
   return (
-    <RemirrorProvider manager={extensionManager}>
+    <Remirror manager={manager} initialContent={state}>
       <SmallEditor />
-    </RemirrorProvider>
+    </Remirror>
   );
 };
+
 Basic.args = {
   autoLink: true,
   openLinkOnClick: true,

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 
 import type { FocusType } from '@remirror/core';
-import { useRemirror } from '@remirror/react';
+import { useRemirrorContext } from '@remirror/react';
 
 import { useEvents } from './use-events';
 
@@ -14,7 +14,7 @@ import { useEvents } from './use-events';
  */
 export function useEditorFocus(): [isFocused: boolean, focus: (position?: FocusType) => void] {
   // Get the view from the context and use it to calculate the initial focus.
-  const { view, focus } = useRemirror();
+  const { view, focus } = useRemirrorContext();
 
   // Create the initial state with the current view focus.
   const [isFocused, setIsFocused] = useState(() => view.hasFocus());

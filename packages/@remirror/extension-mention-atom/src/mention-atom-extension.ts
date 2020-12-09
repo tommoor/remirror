@@ -2,7 +2,7 @@ import {
   ApplySchemaAttributes,
   CommandFunction,
   ErrorConstant,
-  extensionDecorator,
+  extension,
   ExtensionTag,
   Handler,
   invariant,
@@ -107,7 +107,7 @@ export interface MentionAtomOptions
  * It provides mentions as atom nodes which don't support editing once being
  * inserted into the document.
  */
-@extensionDecorator<MentionAtomOptions>({
+@extension<MentionAtomOptions>({
   defaultOptions: {
     selectable: true,
     draggable: false,
@@ -131,7 +131,9 @@ export class MentionAtomExtension extends NodeExtension<MentionAtomOptions> {
     return 'mentionAtom' as const;
   }
 
-  readonly tags = [ExtensionTag.InlineNode, ExtensionTag.Behavior];
+  createTags() {
+    return [ExtensionTag.InlineNode, ExtensionTag.Behavior];
+  }
 
   createNodeSpec(extra: ApplySchemaAttributes): NodeExtensionSpec {
     const dataAttributeId = 'data-mention-atom-id';

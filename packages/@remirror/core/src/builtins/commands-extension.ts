@@ -3,7 +3,9 @@ import {
   entries,
   invariant,
   isEmptyArray,
-  isNumber,
+  isEmptyObject,
+  isString,
+  keys,
   object,
   uniqueArray,
 } from '@remirror/core-helpers';
@@ -14,23 +16,32 @@ import type {
   DispatchFunction,
   EditorSchema,
   EmptyShape,
+  Fragment,
   FromToParameter,
+  Mark,
+  NodeAttributes,
+  NodeType,
   PrimitiveSelection,
   ProsemirrorAttributes,
+  ProsemirrorNode,
+  Shape,
   Static,
   Transaction,
 } from '@remirror/core-types';
 import {
-  findNodeAtPosition,
+  environment,
   getTextSelection,
+  isTextSelection,
   removeMark,
+  RemoveMarkParameter,
   setBlockType,
   toggleBlockItem,
+  ToggleBlockItemParameter,
   toggleWrap,
   wrapIn,
 } from '@remirror/core-utils';
-import { EditorState, TextSelection } from '@remirror/pm/state';
-import { Decoration, DecorationSet, EditorView } from '@remirror/pm/view';
+import { TextSelection } from '@remirror/pm/state';
+import { EditorView } from '@remirror/pm/view';
 
 import {
   delayedCommand,
@@ -39,29 +50,24 @@ import {
   InsertTextOptions,
   isDelayedValue,
 } from '../commands';
-import { extensionDecorator } from '../decorators';
 import {
   AnyExtension,
   ChainedCommandRunParameter,
   ChainedFromExtensions,
   CommandsFromExtensions,
+  extension,
   PlainExtension,
-  RawCommandsFromExtensions,
 } from '../extension';
+import { FocusType } from '../framework';
 import { throwIfNameNotUnique } from '../helpers';
 import type {
-  AnyCombinedUnion,
-  ChainedFromCombined,
-  CommandsFromCombined,
-  RawCommandsFromCombined,
-} from '../preset';
-import type {
   CommandShape,
-  CreatePluginReturn,
+  CreateExtensionPlugin,
   ExtensionCommandFunction,
   ExtensionCommandReturn,
   StateUpdateLifecycleParameter,
 } from '../types';
+import { command, CommandDecoratorOptions } from './decorators';
 
 export interface CommandOptions {
   /**
@@ -87,9 +93,9 @@ export interface CommandOptions {
  * Typically actions are used to create interactive menus. For example a menu
  * can use a command to toggle bold formatting or to undo the last action.
  *
- * @builtin
+ * @category Builtin Extension
  */
-@extensionDecorator<CommandOptions>({
+@extension<CommandOptions>({
   defaultPriority: ExtensionPriority.Highest,
   defaultOptions: { trackerClassName: 'remirror-tracker-position', trackerNodeName: 'span' },
   staticKeys: ['trackerClassName', 'trackerNodeName'],
@@ -106,25 +112,25 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
    * [[`KeymapExtension`]].
    */
   get transaction(): Transaction {
-    if (this.#customTransaction) {
-      return this.#customTransaction;
+    if (this.customTransaction) {
+      return this.customTransaction;
     }
 
     // Make sure we have the most up to date state.
     const state = this.store.getState();
 
-    if (!this.#transaction) {
+    if (!this._transaction) {
       // Since there is currently no transaction set, make sure to create a new
       // one. Behind the scenes `state.tr` creates a new transaction for us to
       // use.
-      this.#transaction = state.tr;
+      this._transaction = state.tr;
     }
 
     // Check that the current transaction is valid.
-    const isValid = this.#transaction.before.eq(state.doc);
+    const isValid = this._transaction.before.eq(state.doc);
 
     // Check whether the current transaction has any already applied to it.
-    const hasSteps = !isEmptyArray(this.#transaction.steps);
+    const hasSteps = !isEmptyArray(this._transaction.steps);
 
     if (!isValid) {
       // Since the transaction is not valid we create a new one to prevent any
@@ -134,35 +140,37 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
       // Now checking if any steps had been added to the previous transaction
       // and adding them to the newly created transaction.
       if (hasSteps) {
-        for (const step of this.#transaction.steps) {
+        for (const step of this._transaction.steps) {
           tr.step(step);
         }
       }
 
       // Make sure to store the transaction value to the instance of this
       // extension.
-      this.#transaction = tr;
+      this._transaction = tr;
     }
 
-    return this.#transaction;
+    return this._transaction;
   }
 
   /**
    * This is the holder for the shared transaction which is shared by commands
    * in order to support chaining.
    */
-  #transaction?: Transaction;
+  private _transaction?: Transaction;
 
   /**
-   * Sometimes you need some custom transactions.
+   * This is used to set the transaction being updated to be a custom one, which
+   * can be useful if you'd like to use the command chain methods available via
+   * remirror on transactions outside of the update lifecycle.
    */
-  #customTransaction?: Transaction;
+  private customTransaction?: Transaction;
 
   onCreate(): void {
     const { setExtensionStore, setStoreKey } = this.store;
 
     // Support forced updates.
-    setExtensionStore('forceUpdate', this.forceUpdate);
+    setExtensionStore('forceUpdate', this.forceUpdateTransaction);
     setStoreKey('getForcedUpdates', this.getForcedUpdates);
 
     // Enable retrieval of the current transaction.
@@ -186,461 +194,540 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
     const { setStoreKey, setExtensionStore } = this.store;
     const commands: Record<string, CommandShape> = object();
     const names = new Set<string>();
-    const chained: Record<string, any> & ChainedCommandRunParameter = object();
-    const unchained: Record<string, { command: AnyFunction; isEnabled: AnyFunction }> = object();
-    const original: Record<string, (...args: any[]) => CommandFunction> = object();
+    const chain: Record<string, any> & ChainedCommandRunParameter = object();
 
     for (const extension of this.store.extensions) {
-      // There's no need to continue if the extension has no commands.
-      if (!extension.createCommands) {
+      const extensionCommands: ExtensionCommandReturn = extension.createCommands?.() ?? {};
+      const decoratedCommands = extension.decoratedCommands ?? {};
+
+      for (const commandName of keys(decoratedCommands)) {
+        extensionCommands[commandName] = (extension as Shape)[commandName].bind(extension);
+      }
+
+      if (isEmptyObject(extensionCommands)) {
         continue;
       }
 
       // Gather the returned commands object from the extension.
       this.addCommands({
         names,
-        chained,
-        unchained,
-        original,
-        commands: extension.createCommands(),
+        chain,
+        commands,
+        extensionCommands,
+        decoratedCommands,
       });
     }
 
-    for (const [commandName, { command, isEnabled }] of entries(unchained)) {
-      commands[commandName] = command as CommandShape;
-      commands[commandName].isEnabled = isEnabled;
-    }
+    chain.run = () => view.dispatch(this.transaction);
 
-    chained.run = () => view.dispatch(this.transaction);
-
-    setStoreKey('rawCommands', original);
     setStoreKey('commands', commands);
-    setStoreKey('chain', chained as any);
+    setStoreKey('chain', chain as any);
 
-    setExtensionStore('rawCommands', original as any);
     setExtensionStore('commands', commands as any);
-    setExtensionStore('chain', chained as any);
+    setExtensionStore('chain', chain as any);
   }
 
   /**
    * Update the cached transaction whenever the state is updated.
    */
   onStateUpdate({ state }: StateUpdateLifecycleParameter): void {
-    this.#customTransaction = undefined;
-    this.#transaction = state.tr;
+    this.customTransaction = undefined;
+    this._transaction = state.tr;
   }
 
-  createHelpers() {
-    return {
-      /**
-       * Find the position for the tracker with the ID specified.
-       *
-       * @param id - the unique position id which can be any type
-       * @param state - an optional state. Defaults to using the current state.
-       */
-      findPositionTracker: (id: unknown, state?: EditorState) =>
-        this.findPositionTracker(id, state),
+  /**
+   * Enable custom commands to be used within the editor by users.
+   *
+   * This is preferred to the initial idea of setting commands on the
+   * manager or even as a prop. The problem is that there's no typechecking
+   * and it should be just fine to add your custom commands here to see the
+   * dispatched immediately.
+   *
+   * To use it, firstly define the command.
+   *
+   * ```ts
+   * import { CommandFunction } from 'remirror';
+   *
+   * const myCustomCommand: CommandFunction = ({ tr, dispatch }) => {
+   *   dispatch?.(tr.insertText('My Custom Command'));
+   *
+   *   return true;
+   * }
+   * ```
+   *
+   * And then use it within the component.
+   *
+   * ```ts
+   * import React, { useCallback } from 'react';
+   * import { useRemirror } from 'remirror/react';
+   *
+   * const MyEditorButton = () => {
+   *   const { commands } = useRemirror();
+   *   const onClick = useCallback(() => {
+   *     commands.customDispatch(myCustomCommand);
+   *   }, [commands])
+   *
+   *   return <button onClick={onClick}>Custom Command</button>
+   * }
+   * ```
+   *
+   * An alternative is to use a custom command directly from a
+   * `prosemirror-*` library. This can be accomplished in the following way.
+   *
+   *
+   * ```ts
+   * import { joinDown } from 'prosemirror-commands';
+   * import { convertCommand } from 'remirror';
+   *
+   * const MyEditorButton = () => {
+   *   const { commands } = useRemirror();
+   *   const onClick = useCallback(() => {
+   *     commands.customDispatch(convertCommand(joinDown));
+   *   }, [commands]);
+   *
+   *   return <button onClick={onClick}>Custom Command</button>;
+   * };
+   * ```
+   */
+  @command()
+  customDispatch(command: CommandFunction): CommandFunction {
+    return command;
+  }
 
-      /**
-       * Find the positions of all the trackers in document.
-       *
-       * @param state - an optional state. Defaults to using the current state.
-       */
-      findAllPositionTrackers: (state?: EditorState) => this.findAllPositionTrackers(state),
+  /**
+   * Create a custom transaction.
+   *
+   * Use the command at the beginning of the command chain to override the
+   * shared transaction.
+   *
+   * There are times when you want to be sure of the transaction which is
+   * being updated.
+   *
+   * To restore the previous transaction call the `restore` chained method.
+   *
+   * @param tr - the transaction to set
+   *
+   * @remarks
+   *
+   * This is only intended for use within a chainable command chain.
+   *
+   * You **MUST** call the `restore` command after using this to prevent
+   * cryptic errors.
+   */
+  @command()
+  custom(tr: Transaction): CommandFunction {
+    return () => {
+      this.customTransaction = tr;
+      return true;
     };
   }
 
   /**
-   * Create the default commands available to all extensions.
+   * Restore the shared transaction for future chained commands.
    */
-  createCommands() {
-    const commands = {
-      /**
-       * Enable custom commands to be used within the editor by users.
-       *
-       * This is preferred to the initial idea of setting commands on the
-       * manager or even as a prop. The problem is that there's no typechecking
-       * and it should be just fine to add your custom commands here to see the
-       * dispatched immediately.
-       *
-       * To use it, firstly define the command.
-       *
-       * ```ts
-       * import { CommandFunction } from 'remirror/core';
-       *
-       * const myCustomCommand: CommandFunction = ({ tr, dispatch }) => {
-       *   dispatch?.(tr.insertText('My Custom Command'));
-       *
-       *   return true;
-       * }
-       * ```
-       *
-       * And then use it within the component.
-       *
-       * ```ts
-       * import React, { useCallback } from 'react';
-       * import { useRemirror } from 'remirror/react';
-       *
-       * const MyEditorButton = () => {
-       *   const { commands } = useRemirror();
-       *   const onClick = useCallback(() => {
-       *     commands.customDispatch(myCustomCommand);
-       *   }, [commands])
-       *
-       *   return <button onClick={onClick}>Custom Command</button>
-       * }
-       * ```
-       *
-       * An alternative is to use a custom command directly from a
-       * `prosemirror-*` library. This can be accomplished in the following way.
-       *
-       *
-       * ```ts
-       * import { joinDown } from 'prosemirror-commands';
-       * import { convertCommand } from 'remirror/core';
-       *
-       * const MyEditorButton = () => {
-       *   const { commands } = useRemirror();
-       *   const onClick = useCallback(() => {
-       *     commands.customDispatch(convertCommand(joinDown));
-       *   }, [commands]);
-       *
-       *   return <button onClick={onClick}>Custom Command</button>;
-       * };
-       * ```
-       */
-      customDispatch(command: CommandFunction): CommandFunction {
-        return command;
+  @command()
+  restore(): CommandFunction {
+    return () => {
+      this.customTransaction = undefined;
+      return true;
+    };
+  }
+
+  /**
+   * Insert text into the dom at the current location by default. If a
+   * promise is provided instead of text the resolved value will be inserted
+   * at the tracked position.
+   */
+  @command()
+  insertText(
+    text: string | DelayedValue<string>,
+    options: InsertTextOptions = {},
+  ): CommandFunction {
+    if (!isDelayedValue(text)) {
+      return insertText(text, options);
+    }
+
+    return delayedCommand({
+      promise: text,
+      immediate: (parameter) => {
+        console.log('immediate command');
+        return this.store.commands.addPlaceholder.original(text, { type: 'inline', ...options })(
+          parameter,
+        );
       },
 
-      /**
-       * Create a custom transaction.
-       *
-       * Use the command at the beginning of the command chain to override the
-       * shared transaction.
-       *
-       * There are times when you want to be sure of the transaction which is
-       * being updated.
-       *
-       * To restore the previous transaction call the `restore` chained method.
-       *
-       * @param tr - the transaction to set
-       *
-       * @remarks
-       *
-       * This is only intended for use within a chainable command chain.
-       *
-       * You **MUST** call the `restore` command after using this to prevent
-       * cryptic errors.
-       */
-      custom: (tr: Transaction): CommandFunction => {
-        return () => {
-          this.#customTransaction = tr;
-          return true;
-        };
-      },
+      // Handle completion of the command
+      onDone: ({ value }) => {
+        const range = this.store.helpers.findPlaceholder(text);
 
-      /**
-       * Restore the shared transaction for future chained commands.
-       */
-      restore: (): CommandFunction => {
-        return () => {
-          this.#customTransaction = undefined;
-          return true;
-        };
-      },
+        if (!range) {
+          return false;
+        }
 
-      /**
-       * Insert text into the dom at the current location by default. If a
-       * promise is provided instead of text the resolved value will be inserted
-       * at the tracked position.
-       */
-      insertText: (
-        text: string | DelayedValue<string>,
-        options: InsertTextOptions = {},
-      ): CommandFunction =>
-        isDelayedValue(text)
-          ? delayedCommand({
-              promise: text,
-              immediate: commands.addPositionTracker({ id: text, ...options }),
-              onDone: ({ value, ...rest }) => {
-                const range = this.findPositionTracker(text);
-                this.removePositionTracker({ id: text, tr: rest.tr });
-
-                if (!range) {
-                  return false;
-                }
-
-                return commands.insertText(value, range)(rest);
-              },
-              // Cleanup in case of an error.
-              onFail: commands.removePositionTracker(text),
-            })
-          : insertText(text, options),
-
-      /**
-       * Select the text within the provided range.
-       */
-      selectText: (selection: PrimitiveSelection): CommandFunction => ({ tr, dispatch }) => {
-        const textSelection = getTextSelection(selection, tr.doc);
-
-        // TODO: add some safety checks here. If the selection is out of range
-        // perhaps silently fail
-        dispatch?.(tr.setSelection(textSelection));
+        this.store.chain.removePlaceholder(text).insertText(value, range).run();
 
         return true;
       },
 
-      /**
-       * Delete the provided range or current selection.
-       */
-      delete(range?: FromToParameter): CommandFunction {
-        return ({ tr, dispatch }) => {
-          const { from, to } = range ?? tr.selection;
-          dispatch?.(tr.delete(from, to));
-
-          return true;
-        };
+      // Cleanup in case of an error.
+      onFail: (parameter) => {
+        return this.store.commands.removePlaceholder.original(text)(parameter);
       },
-
-      /**
-       * Fire an empty update to trigger an update to all decorations, and state
-       * that may not yet have run.
-       *
-       * This can be used in extensions to trigger updates certain options that
-       * affect the editor state have updated.
-       */
-      emptyUpdate: (): CommandFunction => {
-        return ({ tr, dispatch }) => {
-          dispatch?.(tr);
-
-          return true;
-        };
-      },
-
-      /**
-       * Force an update of the specific
-       */
-      forceUpdate: (...keys: UpdatableViewProps[]): CommandFunction => {
-        return ({ tr, dispatch }) => {
-          dispatch?.(this.forceUpdate(tr, ...keys));
-
-          return true;
-        };
-      },
-
-      /**
-       * Update the attributes for the node at the specified `pos` in the
-       * editor.
-       */
-      updateNodeAttributes: <Type extends object>(
-        pos: number,
-        attrs: ProsemirrorAttributes<Type>,
-      ): CommandFunction => {
-        return ({ tr, dispatch }) => {
-          dispatch?.(tr.setNodeMarkup(pos, undefined, attrs));
-
-          return true;
-        };
-      },
-
-      /**
-       * Fire an update to remove the current range selection. The cursor will
-       * be placed at the anchor of the current range selection.
-       *
-       * A range selection is a non-empty text selection.
-       */
-      emptySelection: (): CommandFunction => {
-        return ({ tr, dispatch }) => {
-          const { selection } = tr;
-
-          if (selection.empty) {
-            return false;
-          }
-
-          dispatch?.(tr.setSelection(TextSelection.create(tr.doc, tr.selection.anchor)));
-          return true;
-        };
-      },
-
-      /**
-       * Command to dispatch a transaction adding the tracker position to be
-       * tracked.
-       *
-       * @param id - the value that is used to identify this tracker. This can
-       * be any value. A promise, a function call, a string.
-       * @param options - the options to call the tracked position with. You can
-       * specify the range `{ from: number; to: number }` as well as the class
-       * name.
-       */
-      addPositionTracker: (tracker: AddPositionTrackerParameter): CommandFunction => ({
-        dispatch,
-        tr,
-      }) => {
-        return this.addPositionTracker({ ...tracker, tr, checkOnly: !dispatch })
-          ? (dispatch?.(tr), true)
-          : false;
-      },
-
-      /**
-       * A command to remove the specified tracker position.
-       */
-      removePositionTracker: (id: unknown): CommandFunction => ({ dispatch, tr }) => {
-        return this.removePositionTracker({ id, tr, checkOnly: !dispatch })
-          ? (dispatch?.(tr), true)
-          : false;
-      },
-
-      /**
-       * A command to remove all active tracker positions.
-       */
-      clearPositionTrackers: (): CommandFunction => ({ tr, dispatch }) => {
-        return this.clearPositionTrackers({ tr, checkOnly: !dispatch })
-          ? (dispatch?.(tr), true)
-          : false;
-      },
-
-      /**
-       * Set the block type of the current selection or the provided range.
-       */
-      setBlockNodeType: setBlockType,
-
-      /**
-       * Toggle between wrapping an inactive node with the provided node type, and
-       * lifting it up into it's parent.
-       *
-       * @param nodeType - the node type to toggle
-       * @param attrs - the attrs to use for the node
-       */
-      toggleWrappingNode: toggleWrap,
-
-      /**
-       * Toggle a block between the provided type and toggleType.
-       */
-      toggleBlockNodeItem: toggleBlockItem,
-
-      /**
-       * Wrap the selection or the provided text in a node of the given type with the
-       * given attributes.
-       */
-      wrapInNode: wrapIn,
-
-      /**
-       * Removes a mark from the current selection or provided range.
-       */
-      removeMark,
-    };
-
-    return commands;
+    });
   }
 
   /**
-   * This plugin stores all tracked positions in the editor and maps them via
-   * the transaction updates.
+   * Select the text within the provided range.
+   *
+   * Here are some ways it can be used.
+   *
+   * ```ts
+   * // Set to the end of the document.
+   * commands.setSelection('end');
+   *
+   * // Set the selection to the start of the document.
+   * commands.setSelection('start');
+   *
+   * // Select all the text in the document.
+   * commands.setSelection('all')
+   *
+   * // Select a range of text. It's up to you to make sure the selected
+   * // range is valid.
+   * commands.setSelection({ from: 10, to: 15 });
+   *
+   * // Specify the anchor and range in the selection.
+   * commands.setSelection({ anchor: 10, head: 15 });
+   *
+   * // Set to a specific position.
+   * commands.setSelection(10);
+   *
+   * // Use a ProseMirror selection
+   * commands.setSelection(new TextSelection(state.doc.resolve(10)))
+   * ```
+   *
+   * Although this is called `selectText` you can provide your own selection
+   * option which can be any type of selection.
    */
-  createPlugin(): CreatePluginReturn {
-    return {
-      state: {
-        init: () => {
-          return DecorationSet.empty;
-        },
-        apply: (tr, decorationSet: DecorationSet) => {
-          // Map the decoration based on the changes to the document.
-          decorationSet = decorationSet.map(tr.mapping, tr.doc);
+  @command()
+  selectText(selection: PrimitiveSelection): CommandFunction {
+    return ({ tr, dispatch }) => {
+      const textSelection = getTextSelection(selection, tr.doc);
 
-          // Get tracker updates from the meta data
-          const { added, clearTrackers, removed } = this.getMeta(tr);
+      // TODO: add some safety checks here. If the selection is out of range
+      // perhaps silently fail
+      dispatch?.(tr.setSelection(textSelection));
 
-          if (clearTrackers) {
-            return DecorationSet.empty;
-          }
-
-          // Update the decorations with any added position trackers.
-          for (const add of added) {
-            const { className, nodeName, id, from, to, pos, node } = add;
-
-            let deco: Decoration;
-
-            if (isNumber(pos)) {
-              // It's up to the user to ensure the position exists before
-              // adding.
-              const $pos = tr.doc.resolve(pos);
-
-              if ($pos.nodeAfter) {
-                deco = Decoration.node(
-                  pos,
-                  pos + $pos.nodeAfter.nodeSize,
-                  { nodeName, class: className },
-                  { id, type: this.name },
-                );
-              } else {
-                // TODO it would nice to cancel the whole tracker when node not
-                // found.
-
-                // Since is a pos was provided there's no need to check anything
-                // else in this block.
-                continue;
-              }
-            } else if (node) {
-              // In this block find the parent node of the current `from`
-              // position and use that to mark the decoration.
-              const $pos = tr.doc.resolve(from);
-              const found = findNodeAtPosition($pos);
-
-              if (found) {
-                deco = Decoration.node(
-                  found.pos,
-                  found.end,
-                  { nodeName, class: className },
-                  { id, type: this.name },
-                );
-              } else {
-                // TODO it would nice to cancel the whole tracker when node not
-                // found.
-
-                // Don't add a decoration since the user specified that this
-                // should be a node
-                continue;
-              }
-            } else if (from === to) {
-              // Add this as a widget if the range is empty.
-              const widget = document.createElement(nodeName);
-              widget.classList.add(className);
-              deco = Decoration.widget(from, document.createElement(nodeName), {
-                id,
-                type: this.name,
-              });
-            } else {
-              // Make this span across nodes if the range is not empty.
-              deco = Decoration.inline(
-                from,
-                to,
-                { nodeName, class: className },
-                { id, type: this.name },
-              );
-            }
-
-            decorationSet = decorationSet.add(tr.doc, [deco]);
-          }
-
-          for (const id of removed) {
-            const found = decorationSet.find(
-              undefined,
-              undefined,
-              (spec) => spec.id === id && spec.type === this.name,
-            );
-            decorationSet = decorationSet.remove(found);
-          }
-
-          return decorationSet;
-        },
-      },
-      props: {
-        decorations: (state) => {
-          return this.getPluginState(state);
-        },
-      },
+      return true;
     };
+  }
+
+  /**
+   * Delete the provided range or current selection.
+   */
+  @command()
+  delete(range?: FromToParameter): CommandFunction {
+    return ({ tr, dispatch }) => {
+      const { from, to } = range ?? tr.selection;
+      dispatch?.(tr.delete(from, to));
+
+      return true;
+    };
+  }
+
+  /**
+   * Fire an empty update to trigger an update to all decorations, and state
+   * that may not yet have run.
+   *
+   * This can be used in extensions to trigger updates certain options that
+   * affect the editor state have updated.
+   *
+   * @param action - provide an action which is called just before the empty
+   * update is dispatched (only when dispatch is available). This can be used in
+   * chainable editor scenarios when you want to lazily invoke an action at the
+   * point the update is about to be applied.
+   */
+  @command()
+  emptyUpdate(action?: () => void): CommandFunction {
+    return ({ tr, dispatch }) => {
+      if (dispatch) {
+        action?.();
+        dispatch(tr);
+      }
+
+      return true;
+    };
+  }
+
+  /**
+   * Force an update of the specific updatable ProseMirror props.
+   *
+   * This command is always available as a builtin command.
+   *
+   * @category Builtin Command
+   */
+  @command()
+  forceUpdate(...keys: UpdatableViewProps[]): CommandFunction {
+    return ({ tr, dispatch }) => {
+      dispatch?.(this.forceUpdateTransaction(tr, ...keys));
+
+      return true;
+    };
+  }
+
+  /**
+   * Update the attributes for the node at the specified `pos` in the
+   * editor.
+   *
+   * @category Builtin Command
+   */
+  @command()
+  updateNodeAttributes<Type extends object>(
+    pos: number,
+    attrs: ProsemirrorAttributes<Type>,
+  ): CommandFunction {
+    return ({ tr, dispatch }) => {
+      dispatch?.(tr.setNodeMarkup(pos, undefined, attrs));
+
+      return true;
+    };
+  }
+
+  /**
+   * Fire an update to remove the current range selection. The cursor will
+   * be placed at the anchor of the current range selection.
+   *
+   * A range selection is a non-empty text selection.
+   *
+   * @category Builtin Command
+   */
+  @command()
+  emptySelection(): CommandFunction {
+    return ({ tr, dispatch }) => {
+      const { selection } = tr;
+
+      if (selection.empty) {
+        return false;
+      }
+
+      dispatch?.(tr.setSelection(TextSelection.create(tr.doc, tr.selection.anchor)));
+      return true;
+    };
+  }
+
+  /**
+   * Insert a new line into the editor.
+   *
+   * Depending on editor setup and where the cursor is placed this may have
+   * differing impacts.
+   *
+   * @category Builtin Command
+   */
+  @command()
+  insertNewLine(): CommandFunction {
+    return ({ dispatch, tr }) => {
+      if (!isTextSelection(tr.selection)) {
+        return false;
+      }
+
+      dispatch?.(tr.insertText('\n'));
+
+      return true;
+    };
+  }
+
+  /**
+   * Insert a node into the editor with the provided content.
+   *
+   * @category Builtin Command
+   */
+  @command()
+  insertNode(node: string | NodeType, options: InsertNodeOptions): CommandFunction {
+    return ({ dispatch, tr, state }) => {
+      const { attrs, marks, range } = options;
+      const { from, to } = range ?? tr.selection;
+      const nodeType = isString(node) ? state.schema.nodes[node] : node;
+
+      invariant(nodeType, {
+        code: ErrorConstant.INVALID_COMMAND_ARGUMENTS,
+        message: 'The requested node type does not exist in the schema.',
+      });
+
+      const content = nodeType.createAndFill(attrs, options.content, marks);
+
+      if (!content) {
+        return false;
+      }
+
+      // This should not be treated as a replacement.
+      const isReplacement = from !== to;
+      dispatch?.(isReplacement ? tr.replaceRangeWith(from, to, content) : tr.insert(from, content));
+      return true;
+    };
+  }
+
+  /**
+   * Set the focus for the editor.
+   *
+   * If using this with chaining this should only be placed at the end of
+   * the chain. It can cause hard to debug issues when used in the middle of
+   * a chain.
+   *
+   * ```tsx
+   * import { useCallback } from 'react';
+   * import { useRemirrorContext } from 'remirror/react';
+   *
+   * const MenuButton = () => {
+   *   const { chain } = useRemirrorContext();
+   *   const onClick = useCallback(() => {
+   *     chain
+   *       .toggleBold()
+   *       .focus('end')
+   *       .run();
+   *   }, [chain])
+   *
+   *   return <button onClick={onClick}>Bold</button>
+   * }
+   * ```
+   */
+  @command()
+  focus(position?: FocusType): CommandFunction {
+    return (parameter) => {
+      const { dispatch, tr } = parameter;
+      const { view } = this.store;
+
+      if (position === false) {
+        return false;
+      }
+
+      if (view.hasFocus() && (position === undefined || position === true)) {
+        return false;
+      }
+
+      // Keep the current selection when position is `true` or `undefined`.
+      if (position === undefined || position === true) {
+        const { from = 0, to = from } = tr.selection;
+        position = { from, to };
+      }
+
+      if (dispatch) {
+        // Focus only when dispatch is provided.
+        this.delayedFocus();
+      }
+
+      return this.selectText(position)(parameter);
+    };
+  }
+
+  /**
+   * Blur focus from the editor and also update the selection at the same
+   * time.
+   */
+  @command()
+  blur(position?: PrimitiveSelection): CommandFunction {
+    return (parameter) => {
+      const { view } = this.store;
+
+      if (!view.hasFocus()) {
+        return false;
+      }
+
+      requestAnimationFrame(() => {
+        (view.dom as HTMLElement).blur();
+      });
+
+      return position ? this.selectText(position)(parameter) : true;
+    };
+  }
+
+  /**
+   * Set the block type of the current selection or the provided range.
+   */
+  @command()
+  setBlockNodeType(
+    nodeType: string | NodeType,
+    attrs?: ProsemirrorAttributes | undefined,
+    range?: FromToParameter | undefined,
+  ): CommandFunction {
+    return setBlockType(nodeType, attrs, range);
+  }
+
+  /**
+   * Toggle between wrapping an inactive node with the provided node type, and
+   * lifting it up into it's parent.
+   *
+   * @param nodeType - the node type to toggle
+   * @param attrs - the attrs to use for the node
+   */
+  @command()
+  toggleWrappingNode(nodeType: string | NodeType, attrs?: ProsemirrorAttributes): CommandFunction {
+    return toggleWrap(nodeType, attrs);
+  }
+
+  /**
+   * Toggle a block between the provided type and toggleType.
+   */
+  @command()
+  toggleBlockNodeItem(toggleParameter: ToggleBlockItemParameter): CommandFunction {
+    return toggleBlockItem(toggleParameter);
+  }
+
+  /**
+   * Wrap the selection or the provided text in a node of the given type with the
+   * given attributes.
+   */
+  @command()
+  wrapInNode(
+    nodeType: string | NodeType,
+    attrs?: NodeAttributes,
+    range?: FromToParameter | undefined,
+  ): CommandFunction {
+    return wrapIn(nodeType, attrs, range);
+  }
+
+  /**
+   * Removes a mark from the current selection or provided range.
+   */
+  @command()
+  removeMark(parameter: RemoveMarkParameter): CommandFunction {
+    return removeMark(parameter);
+  }
+
+  /**
+   * Create a plugin that solely exists to track forced updates via the
+   * generated plugin key.
+   */
+  createPlugin(): CreateExtensionPlugin {
+    return {};
+  }
+
+  /**
+   * Needed on iOS since `requestAnimationFrame` doesn't breaks the focus
+   * implementation.
+   */
+  private handleIosFocus(): void {
+    if (!environment.isIos) {
+      return;
+    }
+
+    (this.store.view.dom as HTMLElement).focus();
+  }
+
+  /**
+   * Focus the editor after a slight delay.
+   */
+  private delayedFocus(): void {
+    // Manage focus on iOS.
+    this.handleIosFocus();
+
+    requestAnimationFrame(() => {
+      // Use the built in focus method to refocus the editor.
+      this.store.view.focus();
+
+      // This has to be called again in order for Safari to scroll into view
+      // after the focus. Perhaps there's a better way though or maybe place
+      // behind a flag.
+      this.store.view.dispatch(this.transaction.scrollIntoView());
+    });
   }
 
   /**
@@ -649,7 +736,10 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
    * `manager.store.getForcedUpdate(tr)`. If that has a value then it should use
    * the unique symbol to update the key.
    */
-  private readonly forceUpdate = (tr: Transaction, ...keys: UpdatableViewProps[]): Transaction => {
+  private readonly forceUpdateTransaction = (
+    tr: Transaction,
+    ...keys: UpdatableViewProps[]
+  ): Transaction => {
     const { forcedUpdates } = this.getMeta(tr);
 
     this.setMeta(tr, { forcedUpdates: uniqueArray([...forcedUpdates, ...keys]) });
@@ -669,7 +759,7 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
   };
 
   /**
-   * Get the command metadata
+   * Get the command metadata.
    */
   private getMeta(tr: Transaction): Required<CommandExtensionMeta> {
     const meta = tr.getMeta(this.pluginKey) ?? {};
@@ -686,9 +776,9 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
    * `original` and `unchained` objects.
    */
   private addCommands(parameter: AddCommandsParameter) {
-    const { chained, commands, names, unchained, original } = parameter;
+    const { extensionCommands, chain, commands, names, decoratedCommands } = parameter;
 
-    for (const [name, command] of entries(commands)) {
+    for (const [name, command] of entries(extensionCommands)) {
       // Command names must be unique.
       throwIfNameNotUnique({ name, set: names, code: ErrorConstant.DUPLICATE_COMMAND_NAMES });
 
@@ -698,15 +788,13 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
         message: 'The command name you chose is forbidden.',
       });
 
-      // Store the original command.
-      original[name] = command;
+      // Create the unchained command.
+      commands[name] = this.createUnchainedCommand(command);
 
-      unchained[name] = {
-        command: this.unchainedFactory({ command }),
-        isEnabled: this.unchainedFactory({ command, shouldDispatch: false }),
-      };
-
-      chained[name] = this.chainedFactory({ command, chained });
+      if (!decoratedCommands[name]?.disableChaining) {
+        // Create the chained command.
+        chain[name] = this.chainedFactory({ command, chain: chain });
+      }
     }
   }
 
@@ -730,11 +818,22 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
   }
 
   /**
+   * Create the unchained command.
+   */
+  private createUnchainedCommand(command: ExtensionCommandFunction): CommandShape {
+    const unchainedCommand: CommandShape = this.unchainedFactory({ command }) as any;
+    unchainedCommand.isEnabled = this.unchainedFactory({ command, shouldDispatch: true });
+    unchainedCommand.original = command;
+
+    return unchainedCommand;
+  }
+
+  /**
    * Create a chained command method.
    */
   private chainedFactory(parameter: ChainedFactoryParameter) {
-    return (...spread: unknown[]) => {
-      const { chained, command } = parameter;
+    return (...args: unknown[]) => {
+      const { chain: chained, command } = parameter;
       const { view } = this.store;
       const { state } = view;
 
@@ -755,225 +854,59 @@ export class CommandsExtension extends PlainExtension<CommandOptions> {
         });
       };
 
-      command(...spread)({ state, dispatch, view, tr: this.transaction });
+      command(...args)({ state, dispatch, view, tr: this.transaction });
 
       return chained;
     };
   }
+}
 
-  /**
-   * Add a tracker position with the specified params to the transaction and
-   * return the transaction.
-   *
-   * It is up to you to dispatch the transaction or you can just use the
-   * commands.
-   */
-  private addPositionTracker(
-    parameter: AddPositionTrackerParameter & { tr: Transaction; checkOnly?: boolean },
-  ): boolean {
-    const { tr, checkOnly = false, id, ...rest } = parameter;
-    const existingPosition = this.findPositionTracker(id);
-
-    if (existingPosition) {
-      return false;
-    }
-
-    if (checkOnly) {
-      return true;
-    }
-
-    const { added } = this.getMeta(tr);
-    const { trackerClassName, trackerNodeName } = this.options;
-    const { from, to, className, nodeName = trackerNodeName, pos = null, node = false } = rest;
-
-    const classes = (className ? [trackerClassName, className] : [trackerClassName]).join(' ');
-
-    this.setMeta(tr, {
-      added: [
-        ...added,
-        {
-          id,
-          nodeName,
-          pos,
-          node,
-          from: isNumber(from) ? from : tr.selection.from,
-          to: isNumber(to) ? to : tr.selection.to,
-          className: classes,
-        },
-      ],
-    });
-
-    return true;
-  }
-
-  /**
-   * Discards a previously defined tracker once not needed.
-   *
-   * This should be used to cleanup once the position is no longer needed.
-   */
-  private removePositionTracker(parameter: {
-    id: unknown;
-    tr: Transaction;
-    checkOnly?: boolean;
-  }): boolean {
-    const { id, tr, checkOnly = false } = parameter;
-    const existingPosition = this.findPositionTracker(id);
-
-    if (!existingPosition) {
-      return false;
-    }
-
-    if (checkOnly) {
-      return true;
-    }
-
-    const { removed } = this.getMeta(tr);
-    this.setMeta(tr, { removed: uniqueArray([...removed, id]) });
-
-    return true;
-  }
-
-  /**
-   * This helper returns a transaction that clears all position trackers when
-   * any exist.
-   *
-   * Otherwise it returns undefined.
-   */
-  private clearPositionTrackers(parameter: { tr: Transaction; checkOnly?: boolean }): boolean {
-    const { tr, checkOnly = false } = parameter;
-    const positionTrackerState = this.getPluginState();
-
-    if (positionTrackerState === DecorationSet.empty) {
-      return false;
-    }
-
-    if (checkOnly) {
-      return true;
-    }
-
-    this.setMeta(tr, { clearTrackers: true });
-    return true;
-  }
-
-  /**
-   * Find the position for the tracker with the ID specified.
-   *
-   * @param id - the unique position id which can be any type
-   * @param state - an optional state. Defaults to using the current state.
-   */
-  private findPositionTracker(id: unknown, state?: EditorState): FromToParameter | undefined {
-    return this.findAllPositionTrackers(state).get(id);
-  }
-
-  /**
-   * Find the positions of all the trackers in document.
-   *
-   * @param state - an optional state. Defaults to using the current state.
-   */
-  private findAllPositionTrackers(state?: EditorState): Map<unknown, FromToParameter> {
-    const trackers: Map<unknown, FromToParameter> = new Map();
-    const decorations = this.getPluginState<DecorationSet>(state);
-    const found = decorations.find(undefined, undefined, (spec) => spec.type === this.name);
-
-    for (const decoration of found) {
-      trackers.set(decoration.spec.id, { from: decoration.from, to: decoration.to });
-    }
-
-    return trackers;
-  }
+export interface InsertNodeOptions {
+  attrs?: NodeAttributes;
+  marks?: Mark[];
+  content?: Fragment | ProsemirrorNode | ProsemirrorNode[];
+  range?: FromToParameter;
 }
 
 const DEFAULT_COMMAND_META: Required<CommandExtensionMeta> = {
-  added: [],
-  clearTrackers: false,
   forcedUpdates: [],
-  removed: [],
 };
 
 /**
  * Provides the list of Prosemirror EditorView props that should be updated/
  */
 export type ForcedUpdateMeta = UpdatableViewProps[];
-export type UpdatableViewProps = 'attributes' | 'editable' | 'nodeViews';
+export type UpdatableViewProps = 'attributes' | 'editable';
 
 export interface CommandExtensionMeta {
   forcedUpdates?: UpdatableViewProps[];
-
-  /**
-   * The trackers to add.
-   */
-  added?: Array<Required<AddPositionTrackerParameter>>;
-
-  /**
-   * The trackers to remove.
-   */
-  removed?: unknown[];
-
-  /**
-   * When set to true will delete all the active trackers.
-   */
-  clearTrackers?: boolean;
-}
-
-interface PositionTrackerOptions extends Partial<FromToParameter> {
-  /**
-   * A custom class name to use for the tracker position. All the trackers will
-   * automatically be given the class name `remirror-tracker-position`
-   *
-   * @default ''
-   */
-  className?: string;
-
-  /**
-   * A custom html element or string for a created element tag name.
-   *
-   * @default 'tracker'
-   */
-  nodeName?: string;
-
-  /**
-   * Whether to force the selection of the parent node.
-   */
-  node?: boolean;
-
-  /**
-   * Provide this to set this as a node selection. The `pos` must be directly
-   * before the node in order to be valid.
-   */
-  pos?: number | null;
-}
-
-interface AddPositionTrackerParameter extends PositionTrackerOptions {
-  /**
-   * The ID by which this position will be uniquely identified. It can be any
-   * unknown value. A string, a function, an object, etc.
-   */
-  id: unknown;
 }
 
 interface AddCommandsParameter {
-  /** The currently amassed commands to mutate with new commands. */
-  chained: Record<string, any> & ChainedCommandRunParameter;
+  /**
+   * The currently amassed command chain to mutate for each extension.
+   */
+  chain: Record<string, any> & ChainedCommandRunParameter;
 
   /**
-   * The currently amassed unchained commands to mutate with new commands.
+   * The currently amassed commands (unchained) to mutate for each extension.
    */
-  unchained: Record<string, { command: AnyFunction; isEnabled: AnyFunction }>;
-
-  /**
-   * The original command function provided by the extension.
-   */
-  original: Record<string, (...args: any[]) => CommandFunction>;
+  commands: Record<string, CommandShape>;
 
   /**
    * The untransformed commands which need to be added to the extension.
    */
-  commands: ExtensionCommandReturn;
+  extensionCommands: ExtensionCommandReturn;
 
   /**
    * The names of the commands amassed. This allows for a uniqueness test.
    */
   names: Set<string>;
+
+  /**
+   * The command decorations with their options which affect runtime settings.
+   */
+  decoratedCommands: Record<string, CommandDecoratorOptions>;
 }
 
 interface UnchainedFactoryParameter {
@@ -999,7 +932,7 @@ interface ChainedFactoryParameter {
   /**
    * All the chained commands
    */
-  chained: Record<string, any>;
+  chain: Record<string, any>;
 }
 
 /**
@@ -1009,7 +942,7 @@ const forbiddenNames = new Set(['run', 'chain', 'original', 'raw']);
 
 declare global {
   namespace Remirror {
-    interface ManagerStore<Combined extends AnyCombinedUnion> {
+    interface ManagerStore<ExtensionUnion extends AnyExtension> {
       /**
        * Enables the use of custom commands created by extensions which extend
        * the functionality of your editor in an expressive way.
@@ -1026,7 +959,7 @@ declare global {
        * }
        * ```
        */
-      commands: CommandsFromCombined<Combined>;
+      commands: CommandsFromExtensions<ExtensionUnion>;
 
       /**
        * Chainable commands for composing functionality together in quaint and
@@ -1062,20 +995,7 @@ declare global {
        *
        * The `run()` method ends the chain and dispatches the command.
        */
-      chain: ChainedFromCombined<Combined>;
-
-      /**
-       * This object gives you access to all the commands defined by the
-       * extensions in your editor exactly as they were defined.
-       *
-       * The type signature is the arguments defined by the command returning a
-       * function that requires a `{ state, dispatch?, tr, view? }` object.
-       *
-       * ```ts
-       * function command(...args: any[]) => CommandFunction;
-       * ```
-       */
-      rawCommands: RawCommandsFromCombined<Combined>;
+      chain: ChainedFromExtensions<ExtensionUnion>;
 
       /**
        * Check for a forced update in the transaction. This pulls the meta data
@@ -1093,7 +1013,7 @@ declare global {
       getForcedUpdates: (tr: Transaction) => UpdatableViewProps[];
     }
 
-    interface ExtensionCreatorMethods {
+    interface BaseExtension {
       /**
        * `ExtensionCommands`
        *
@@ -1105,6 +1025,18 @@ declare global {
       ['~C']: this['createCommands'] extends AnyFunction
         ? ReturnType<this['createCommands']>
         : EmptyShape;
+
+      /**
+       * @experimental
+       *
+       * Stores all the command names for this decoration that have been added
+       * as decorators to the extension instance. This is used by the
+       * `CommandsExtension` to pick the commands and store meta data attached
+       * to each command.
+       *
+       * @internal
+       */
+      decoratedCommands?: Record<string, CommandDecoratorOptions>;
 
       /**
        * Create and register commands for that can be called within the editor.
@@ -1179,7 +1111,7 @@ declare global {
        * `createCommands` function then make sure it is used within the returned
        * function scope and not in the outer scope.
        */
-      commands: CommandsFromExtensions<Builtin | AnyExtension>;
+      commands: CommandsFromExtensions<AllExtensionUnion | (AnyExtension & { _T: false })>;
 
       /**
        * A method that returns an object with all the chainable commands
@@ -1216,20 +1148,7 @@ declare global {
        * This should only be accessed after the `onView` lifecycle method
        * otherwise it will throw an error.
        */
-      chain: ChainedFromExtensions<Builtin | AnyExtension>;
-
-      /**
-       * This object gives you access to all the commands defined by the
-       * extensions in your editor exactly as they were defined.
-       *
-       * The type signature is the arguments defined by the command returning a
-       * function that requires a `{ state, dispatch?, tr, view? }` object.
-       *
-       * ```ts
-       * function command(...args: any[]) => CommandFunction;
-       * ```
-       */
-      rawCommands: RawCommandsFromExtensions<Builtin | AnyExtension>;
+      chain: ChainedFromExtensions<AllExtensionUnion | (AnyExtension & { _T: false })>;
     }
 
     interface AllExtensions {

@@ -1,7 +1,7 @@
 import type { RefractorSyntax } from 'refractor/core';
 import type { LiteralUnion } from 'type-fest';
 
-import type { ProsemirrorAttributes } from '@remirror/core';
+import type { ProsemirrorAttributes, Static } from '@remirror/core';
 
 /**
  * The default supported syntax themes.
@@ -115,6 +115,13 @@ export interface CodeBlockOptions {
    * it is set to a non-empty value, otherwise no decoration will be produced.
    */
   plainTextClassName?: string;
+
+  /**
+   * Extract the language string from a code block.
+   */
+  getLanguageFromDom?: Static<
+    (codeElement: HTMLElement, preElement: HTMLElement) => string | undefined
+  >;
 }
 
 /**

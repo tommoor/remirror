@@ -15,20 +15,15 @@
     "since 2017"
   ],
   "dependencies": {
-    "@babel/runtime": "^7.12.0",
-    "@docusaurus/core": "2.0.0-alpha.66",
-    "@docusaurus/plugin-client-redirects": "2.0.0-alpha.66",
-    "@docusaurus/plugin-content-docs": "2.0.0-alpha.66",
-    "@docusaurus/plugin-ideal-image": "2.0.0-alpha.66",
-    "@docusaurus/preset-classic": "2.0.0-alpha.66",
-    "@docusaurus/theme-live-codeblock": "2.0.0-alpha.66",
-    "@mdx-js/react": "^1.6.19",
+    "@babel/runtime": "^7.12.5",
+    "@chakra-ui/react": "^1.0.2",
+    "@emotion/react": "^11.1.2",
+    "@emotion/styled": "^11.0.0",
+    "@mdx-js/react": "^1.6.22",
     "@remirror/dev": "1.0.0-next.56",
     "@remirror/playground": "1.0.0-next.56",
-    "@remirror/showcase": "1.0.0-next.56",
     "clsx": "^1.1.1",
-    "core-js": "^3.6.5",
-    "docusaurus": "2.0.0-alpha.66",
+    "framer-motion": "^2.9.5",
     "is-absolute-url": "^3.0.3",
     "prism-react-renderer": "^1.1.1",
     "react": "^17.0.1",
@@ -37,11 +32,21 @@
     "remirror": "1.0.0-next.56"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "2.0.0-alpha.66",
-    "@docusaurus/types": "2.0.0-alpha.66",
-    "@types/react": "^16.9.53",
-    "@types/react-dom": "^16.9.8",
+    "@docusaurus/core": "2.0.0-alpha.69",
+    "@docusaurus/module-type-aliases": "2.0.0-alpha.69",
+    "@docusaurus/plugin-client-redirects": "2.0.0-alpha.69",
+    "@docusaurus/plugin-content-docs": "2.0.0-alpha.69",
+    "@docusaurus/plugin-ideal-image": "2.0.0-alpha.69",
+    "@docusaurus/preset-classic": "2.0.0-alpha.69",
+    "@docusaurus/theme-live-codeblock": "2.0.0-alpha.69",
+    "@docusaurus/types": "2.0.0-alpha.69",
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
+    "@types/worker-plugin": "^4.0.0",
     "babel-plugin-dynamic-import-node": "^2.3.3",
-    "monaco-editor-webpack-plugin": "^2.0.0"
+    "core-js": "^3.8.1",
+    "docusaurus": "2.0.0-alpha.66",
+    "monaco-editor-webpack-plugin": "^2.0.0",
+    "worker-plugin": "^5.0.0"
   }
 }

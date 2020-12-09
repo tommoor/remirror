@@ -1,28 +1,19 @@
 import { axe } from 'jest-axe';
 import { RemirrorTestChain } from 'jest-remirror';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { renderToString } from 'react-dom/server';
-
+import { AnyExtension, htmlToProsemirrorNode, RemirrorEventListener } from 'remirror';
 import {
-  AnyExtension,
-  AnyPreset,
-  CombinedUnion,
-  fromHtml,
-  RemirrorEventListener,
-} from '@remirror/core';
-import { hideConsoleError, rafMock } from '@remirror/testing';
-import {
-  act,
   createReactManager,
-  fireEvent,
-  RemirrorProvider,
-  render,
-  strictRender,
-  useManager,
+  ReactExtensionUnion,
+  ReactFrameworkOutput,
+  Remirror,
   useRemirror,
-} from '@remirror/testing/react';
+  useRemirrorContext,
+} from 'remirror/react';
 
-import type { ReactCombinedUnion, ReactFrameworkOutput } from '../react-types';
+import { hideConsoleError, rafMock } from '@remirror/testing';
+import { act, fireEvent, render, strictRender } from '@remirror/testing/react';
 
 const textContent = `This is editor text`;
 const label = 'Remirror editor';
@@ -34,12 +25,7 @@ const handlers = {
 
 test('should be called via a render prop', () => {
   const { getByLabelText } = strictRender(
-    <RemirrorProvider
-      manager={createReactManager([])}
-      label={label}
-      {...handlers}
-      autoRender='start'
-    />,
+    <Remirror manager={createReactManager([])} label={label} {...handlers} autoRender='start' />,
   );
 
   expect(handlers.onChange).toHaveBeenCalledWith(expect.any(Object));
@@ -54,7 +40,7 @@ test('should be called via a render prop', () => {
 
 test('can `suppressHydrationWarning` without breaking', () => {
   const { getByLabelText } = strictRender(
-    <RemirrorProvider
+    <Remirror
       manager={createReactManager([])}
       label={label}
       {...handlers}
@@ -78,7 +64,7 @@ describe('basic functionality', () => {
 
   it('is accessible', async () => {
     const results = await axe(
-      renderToString(<RemirrorProvider manager={createReactManager([])} autoRender='start' />),
+      renderToString(<Remirror manager={createReactManager([])} autoRender='start' />),
     );
 
     expect(results).toHaveNoViolations();
@@ -88,20 +74,20 @@ describe('basic functionality', () => {
     const setContent = jest.fn();
 
     const Component = () => {
-      setContent.mockImplementation(useRemirror().setContent);
+      setContent.mockImplementation(useRemirrorContext().setContent);
       return null;
     };
 
     const { getByLabelText } = strictRender(
-      <RemirrorProvider
+      <Remirror
         label={label}
         {...handlers}
         manager={createReactManager([])}
-        stringHandler={fromHtml}
+        stringHandler={htmlToProsemirrorNode}
         autoRender='start'
       >
         <Component />
-      </RemirrorProvider>,
+      </Remirror>,
     );
 
     act(() => {
@@ -125,9 +111,7 @@ describe('basic functionality', () => {
     const manager = createReactManager([]);
 
     const El = ({ editable }: { editable: boolean }) => {
-      return (
-        <RemirrorProvider editable={editable} label={label} manager={manager} autoRender='start' />
-      );
+      return <Remirror editable={editable} label={label} manager={manager} autoRender='start' />;
     };
 
     const { rerender, getByLabelText } = strictRender(<El editable={true} />);
@@ -141,12 +125,12 @@ describe('basic functionality', () => {
 describe('initialContent', () => {
   it('should render with string content', () => {
     const { container } = strictRender(
-      <RemirrorProvider
+      <Remirror
         label={label}
         {...handlers}
         manager={createReactManager([])}
         initialContent={'<p>Hello</p>'}
-        stringHandler={fromHtml}
+        stringHandler={htmlToProsemirrorNode}
         autoRender='start'
       />,
     );
@@ -161,7 +145,7 @@ describe('initialContent', () => {
     };
 
     const { container } = strictRender(
-      <RemirrorProvider
+      <Remirror
         label={label}
         {...handlers}
         manager={createReactManager([])}
@@ -181,11 +165,11 @@ describe('focus', () => {
   };
 
   let mock: ReturnType<typeof rafMock>;
-  let context: ReactFrameworkOutput<any>;
+  let context: ReactFrameworkOutput<Remirror.Builtin>;
   let editorNode: HTMLElement;
 
   const Component = () => {
-    context = useRemirror();
+    context = useRemirrorContext();
     return null;
   };
 
@@ -193,7 +177,7 @@ describe('focus', () => {
     mock = rafMock();
 
     const { getByRole } = strictRender(
-      <RemirrorProvider
+      <Remirror
         label={label}
         {...handlers}
         manager={createReactManager([])}
@@ -202,7 +186,7 @@ describe('focus', () => {
         autoRender='start'
       >
         <Component />
-      </RemirrorProvider>,
+      </Remirror>,
     );
 
     mock.flush();
@@ -217,7 +201,7 @@ describe('focus', () => {
     expect(context.getState().selection.from).toBe(1);
 
     act(() => {
-      context.focus();
+      context.commands.focus();
       mock.flush();
     });
 
@@ -228,7 +212,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus('end');
+      context.commands.focus('end');
       mock.flush();
     });
 
@@ -239,7 +223,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus('all');
+      context.commands.focus('all');
       mock.flush();
     });
 
@@ -249,7 +233,7 @@ describe('focus', () => {
 
   it('can focus on the `start` even when already focused', () => {
     act(() => {
-      context.focus('start');
+      context.commands.focus('start');
       mock.flush();
     });
 
@@ -260,7 +244,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus(10);
+      context.commands.focus(10);
       mock.flush();
     });
 
@@ -273,7 +257,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus(expected);
+      context.commands.focus(expected);
       mock.flush();
     });
 
@@ -289,7 +273,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus(anchorHead);
+      context.commands.focus(anchorHead);
       mock.flush();
     });
 
@@ -304,7 +288,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus(expected);
+      context.commands.focus(expected);
       mock.flush();
     });
 
@@ -318,7 +302,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus();
+      context.commands.focus();
       mock.flush();
     });
 
@@ -334,7 +318,7 @@ describe('focus', () => {
     editorNode.blur();
 
     act(() => {
-      context.focus(false);
+      context.commands.focus(false);
       mock.flush();
     });
 
@@ -348,46 +332,46 @@ test('`focus` should be chainable', () => {
 
   const manager = createReactManager([]);
   const editor = RemirrorTestChain.create(manager);
-  let context: ReactFrameworkOutput<CombinedUnion<AnyExtension, AnyPreset>>;
+  let context: ReactFrameworkOutput<ReactExtensionUnion<AnyExtension>>;
 
   const TrapContext = () => {
-    context = useRemirror();
+    context = useRemirrorContext();
 
     return null;
   };
 
   const Component = () => {
-    const [value, setValue] = useState(() =>
+    const [state, setState] = useState(() =>
       manager.createState({
         content: '<p>Content </p>',
         selection: 'end',
-        stringHandler: fromHtml,
+        stringHandler: htmlToProsemirrorNode,
       }),
     );
 
-    const onChange: RemirrorEventListener<ReactCombinedUnion<never>> = useCallback(
+    const onChange: RemirrorEventListener<ReactExtensionUnion<never>> = useCallback(
       ({ state, firstRender }) => {
         if (firstRender) {
           return;
         }
 
         act(() => {
-          setValue(state);
+          setState(state);
         });
       },
       [],
     );
 
     return (
-      <RemirrorProvider
+      <Remirror
         autoFocus={true}
         manager={manager}
         onChange={onChange}
-        value={value}
+        state={state}
         autoRender='start'
       >
         <TrapContext />
-      </RemirrorProvider>
+      </Remirror>
     );
   };
 
@@ -397,7 +381,7 @@ test('`focus` should be chainable', () => {
 
   act(() => {
     editor.commands.insertText(' abc');
-    context.focus(1);
+    context.commands.focus(1);
     mock.flush();
   });
 
@@ -413,40 +397,22 @@ test('`focus` should be chainable', () => {
 });
 
 describe('onChange', () => {
-  const chain = RemirrorTestChain.create(createReactManager(() => []));
-  const mock = jest.fn();
+  it('updates values', () => {
+    const chain = RemirrorTestChain.create(createReactManager(() => []));
+    const mock = jest.fn();
 
-  const Component = () => {
-    const manager = useManager(chain.manager);
-    const [state, setState] = useState(0);
+    const Component = () => {
+      const { manager } = useRemirror({ extensions: chain.manager });
+      const [state, setState] = useState(0);
 
-    const onChange = () => {
-      setState((value) => value + 1);
-      mock(state);
+      const onChange = () => {
+        setState((value) => value + 1);
+        mock(state);
+      };
+
+      return <Remirror manager={manager} onChange={onChange} />;
     };
 
-    return (
-      <RemirrorProvider manager={manager} onChange={onChange}>
-        <TextEditor />
-      </RemirrorProvider>
-    );
-  };
-
-  const TextEditor = () => {
-    const { getRootProps } = useRemirror();
-
-    return (
-      <>
-        <div {...getRootProps()} />
-      </>
-    );
-  };
-
-  beforeEach(() => {
-    mock.mockClear();
-  });
-
-  it('updates values', () => {
     render(<Component />);
 
     for (const char of 'mazing!') {
@@ -460,6 +426,21 @@ describe('onChange', () => {
   });
 
   it('updates values in `StrictMode`', () => {
+    const chain = RemirrorTestChain.create(createReactManager(() => []));
+    const mock = jest.fn();
+
+    const Component = () => {
+      const { manager } = useRemirror({ extensions: chain.manager });
+      const [state, setState] = useState(0);
+
+      const onChange = () => {
+        setState((value) => value + 1);
+        mock(state);
+      };
+
+      return <Remirror manager={manager} onChange={onChange} />;
+    };
+
     strictRender(<Component />);
 
     for (const char of 'mazing!') {

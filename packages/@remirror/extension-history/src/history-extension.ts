@@ -4,7 +4,7 @@ import {
   DispatchFunction,
   EditorState,
   environment,
-  extensionDecorator,
+  extension,
   Handler,
   isFunction,
   nonChainable,
@@ -75,9 +75,9 @@ export interface HistoryOptions {
  * This extension provides undo and redo commands and inserts a plugin which
  * handles history related actions.
  *
- * @builtin
+ * @category Builtin Extension
  */
-@extensionDecorator<HistoryOptions>({
+@extension<HistoryOptions>({
   defaultOptions: {
     depth: 100,
     newGroupDelay: 500,

@@ -180,10 +180,9 @@ function findMatch<Schema extends EditorSchema = EditorSchema>(
   });
 }
 
-type RecheckMatchParameter<Schema extends EditorSchema = EditorSchema> = SuggestStateMatchParameter<
-  Schema
-> &
-  EditorStateParameter<Schema>;
+type RecheckMatchParameter<
+  Schema extends EditorSchema = EditorSchema
+> = SuggestStateMatchParameter<Schema> & EditorStateParameter<Schema>;
 
 /**
  * Checks the provided match and generates a new match. This is useful for
@@ -261,10 +260,9 @@ function createInsertReason<Schema extends EditorSchema = EditorSchema>(
   return {};
 }
 
-type FindJumpReasonParameter<Schema extends EditorSchema = EditorSchema> = CompareMatchParameter<
-  Schema
-> &
-  EditorStateParameter<Schema>;
+type FindJumpReasonParameter<
+  Schema extends EditorSchema = EditorSchema
+> = CompareMatchParameter<Schema> & EditorStateParameter<Schema>;
 
 /**
  * Find the reason for the Jump between two suggesters.
@@ -367,9 +365,9 @@ interface FindPositionParameter<Schema extends EditorSchema = EditorSchema>
   regexp: RegExp;
 }
 
-type FindReasonParameter<Schema extends EditorSchema = EditorSchema> = EditorStateParameter<
-  Schema
-> &
+type FindReasonParameter<
+  Schema extends EditorSchema = EditorSchema
+> = EditorStateParameter<Schema> &
   ResolvedPosParameter<Schema> &
   Partial<CompareMatchParameter<Schema>>;
 

@@ -18,6 +18,7 @@ import {
   PosParameter,
   ProsemirrorAttributes,
   ProsemirrorNode,
+  range,
   TextParameter,
 } from '@remirror/core';
 import { TextSelection } from '@remirror/pm/state';
@@ -132,12 +133,11 @@ export function createDecorations(parameter: CreateDecorationsParameter): Decora
       ? positionedRefractorNodes.length - 1
       : positionedRefractorNodes.length;
 
-    for (let index = 0; index < lastBlockLength; index++) {
+    for (const index of range(lastBlockLength)) {
       const positionedRefractorNode = positionedRefractorNodes[index];
+      const classes = positionedRefractorNode?.classes;
 
-      const classes = positionedRefractorNode.classes;
-
-      if (classes.length === 0) {
+      if (!positionedRefractorNode || !classes?.length) {
         // Do not create a decoration if we cannot assign at least one class
         continue;
       }
@@ -207,7 +207,7 @@ interface GetLanguageParameter {
   /**
    * The language input from the user;
    */
-  language: string;
+  language: string | undefined;
 
   /**
    * The default language to use if none found.
@@ -318,4 +318,12 @@ export function formatCodeBlockFactory(parameter: FormatCodeBlockFactoryParamete
 
     return true;
   };
+}
+
+/**
+ * Get the language from the provided `code` element. This is used as the
+ * default implementation in the `CodeExtension` but it can be overridden.
+ */
+export function getLanguageFromDom(codeElement: HTMLElement): string | undefined {
+  return codeElement.getAttribute(dataAttribute) ?? codeElement.classList[0];
 }

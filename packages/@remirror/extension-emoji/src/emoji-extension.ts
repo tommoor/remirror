@@ -6,7 +6,7 @@ import {
   CommandFunction,
   entries,
   ErrorConstant,
-  extensionDecorator,
+  extension,
   FromToParameter,
   Handler,
   includes,
@@ -51,7 +51,7 @@ export const DEFAULT_FREQUENTLY_USED: Names[] = [
   'poop',
 ];
 
-@extensionDecorator<EmojiOptions>({
+@extension<EmojiOptions>({
   defaultOptions: {
     defaultEmoji: DEFAULT_FREQUENTLY_USED,
     suggestionCharacter: ':',

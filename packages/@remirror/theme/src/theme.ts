@@ -1,6 +1,57 @@
+import { css } from '@linaria/core';
 import { kebabCase } from 'case-anything';
+import { darken, readableColor, transparentize } from 'polished';
 
 import type { DeepPartial, DeepString } from '@remirror/core-types';
+
+export interface CreateThemeVariablesReturn {
+  /**
+   * A css string of the variables.
+   */
+  css: string;
+
+  /**
+   * A styles object version of the created css.
+   */
+  styles: Record<string, string | number>;
+}
+
+/**
+ * Create the theme variables from the provided theme.
+ *
+ * This function can't use anything from `@remirror/core-helpers` due to being
+ * used in the `themeStyles` css. Babel can't resolve the imported functions in
+ * development.
+ */
+export function createThemeVariables(theme: RemirrorThemeType = {}): CreateThemeVariablesReturn {
+  const cssVariableString: string[] = [];
+  const cssVariableObject: Record<string, string | number> = {};
+
+  function addCssVariable(keys: string[], value: unknown) {
+    if (typeof value === 'string' || typeof value === 'number') {
+      cssVariableString.push(`${getCustomPropertyName(keys)}: ${value};`);
+      cssVariableObject[getCustomPropertyName(keys)] = value;
+
+      return;
+    }
+
+    if (typeof value !== 'object' || !value) {
+      return;
+    }
+
+    for (const [key, v] of Object.entries(value)) {
+      addCssVariable([...keys, key], v);
+    }
+
+    return;
+  }
+
+  for (const [key, value] of Object.entries(theme)) {
+    addCssVariable([key], value);
+  }
+
+  return { css: cssVariableString.join('\n'), styles: cssVariableObject };
+}
 
 /**
  * Aliased name for the color type. It's just a string.
@@ -19,16 +70,10 @@ export type Hue = [Color, Color, Color, Color, Color, Color, Color, Color, Color
 export type RemirrorThemeType = DeepPartial<Remirror.Theme>;
 
 /**
- * The Remirror atom type which can be extended by adding properties to the
- * global Remirror.Atom namespace.
- */
-export type RemirrorAtomType = DeepPartial<Remirror.Atom>;
-
-/**
- * Get the remirror variable from the keys to access it in the them object.
+ * Get the remirror variable from the keys to access it in the theme object.
  */
 function getCustomPropertyName(keys: string[]) {
-  return `--remirror-${keys.map(kebabCase).join('-')}`;
+  return `--rmr-${keys.map(kebabCase).join('-')}`;
 }
 
 /**
@@ -238,22 +283,82 @@ const defaultRemirrorThemeHue: Remirror.ThemeHue = {
   ],
 };
 
+const foreground = '#000000';
+const background = '#ffffff';
+const text = '#252103';
+const border = transparentize(0.75, foreground);
+const primary = '#7963d2';
+const secondary = '#bcd263';
+const primaryText = '#fff';
+const secondaryText = '#fff';
+const muted = defaultRemirrorThemeHue.gray[1];
+const shadow1 = 'rgba(10,31,68,0.08)';
+const shadow2 = 'rgba(10,31,68,0.10)';
+const shadow3 = 'rgba(10,31,68,0.12)';
+
+const baseColorTheme: Remirror.NamedColor = {
+  background,
+  border,
+  foreground,
+  muted,
+  primary,
+  secondary,
+  primaryText,
+  secondaryText,
+  text,
+};
+
+const activeColorTheme: Remirror.NamedColor = {
+  ...baseColorTheme,
+  background: darken(0.1, background),
+  border: darken(0.1, border),
+  foreground: darken(0.1, foreground),
+  muted: darken(0.1, muted),
+  primary: darken(0.1, primary),
+  secondary: darken(0.1, secondary),
+  get text() {
+    return readableColor(this.background);
+  },
+  get primaryText() {
+    return readableColor(this.primary);
+  },
+  get secondaryText() {
+    return readableColor(this.secondary);
+  },
+};
+
+const hoverColorTheme: Remirror.NamedColor = {
+  ...baseColorTheme,
+  background: darken(0.2, background),
+  border: darken(0.2, border),
+  foreground: darken(0.2, foreground),
+  muted: darken(0.2, muted),
+  primary: darken(0.2, primary),
+  secondary: darken(0.2, secondary),
+  get text() {
+    return readableColor(this.background);
+  },
+  get primaryText() {
+    return readableColor(this.primary);
+  },
+  get secondaryText() {
+    return readableColor(this.secondary);
+  },
+};
+
 /**
  * The default remirror theme. This can be mutated with the
  * `mutateRemirrorTheme`.
  */
 export const defaultRemirrorTheme: Remirror.Theme = {
   color: {
-    black: '#000000',
-    white: '#ffffff',
-    text: '#252103',
-    background: '#ffffff',
-    primary: '#7963d2',
-    secondary: '#bcd263',
-    muted: defaultRemirrorThemeHue.gray[1],
-    shadow1: 'rgba(10,31,68,0.08)',
-    shadow2: 'rgba(10,31,68,0.10)',
-    shadow3: 'rgba(10,31,68,0.12)',
+    ...baseColorTheme,
+    active: activeColorTheme,
+    hover: hoverColorTheme,
+    shadow1,
+    shadow2,
+    shadow3,
+    backdrop: transparentize(0.5, foreground),
   },
   hue: defaultRemirrorThemeHue,
   fontFamily: {
@@ -315,40 +420,53 @@ export interface CreateThemeVariablesReturn {
 
 /**
  * Create the theme variables from the provided theme.
+ * The class name for adding theme styles to the remirror editor.
  *
- * This function can't use anything from `@remirror/core-helpers` due to being
- * used in the `themeStyles` css. Babel can't resolve the imported functions in
- * development.
+ * These are the variable names
  */
-export function createThemeVariables(theme: RemirrorThemeType = {}): CreateThemeVariablesReturn {
-  const cssVariableString: string[] = [];
-  const cssVariableObject: Record<string, string | number> = {};
+export const THEME = css`
+  ${createThemeVariables(defaultRemirrorTheme).css}
 
-  function addCssVariable(keys: string[], value: unknown) {
-    if (typeof value === 'string' || typeof value === 'number') {
-      cssVariableString.push(`${getCustomPropertyName(keys)}: ${value};`);
-      cssVariableObject[getCustomPropertyName(keys)] = value;
+  font-family: ${getTheme((t) => t.fontFamily.default)};
+  line-height: ${getTheme((t) => t.lineHeight.default)};
+  font-weight: ${getTheme((t) => t.fontWeight.default)};
 
-      return;
-    }
-
-    if (typeof value !== 'object' || !value) {
-      return;
-    }
-
-    for (const [key, v] of Object.entries(value)) {
-      addCssVariable([...keys, key], v);
-    }
-
-    return;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: ${getTheme((t) => t.color.text)};
+    font-family: ${getTheme((t) => t.fontFamily.heading)};
+    line-height: ${getTheme((t) => t.lineHeight.heading)};
+    font-weight: ${getTheme((t) => t.fontWeight.heading)};
   }
 
-  for (const [key, value] of Object.entries(theme)) {
-    addCssVariable([key], value);
+  h1 {
+    font-size: ${getTheme((t) => t.fontSize[5])};
   }
 
-  return { css: cssVariableString.join('\n'), styles: cssVariableObject };
-}
+  h2 {
+    font-size: ${getTheme((t) => t.fontSize[4])};
+  }
+
+  h3 {
+    font-size: ${getTheme((t) => t.fontSize[3])};
+  }
+
+  h4 {
+    font-size: ${getTheme((t) => t.fontSize[2])};
+  }
+
+  h5 {
+    font-size: ${getTheme((t) => t.fontSize[1])};
+  }
+
+  h6 {
+    font-size: ${getTheme((t) => t.fontSize[0])};
+  }
+`;
 
 declare global {
   namespace Remirror {
@@ -366,22 +484,6 @@ declare global {
       space: ThemeSpace;
       lineHeight: ThemeLineHeight;
       letterSpacing: ThemeLetterSpacing;
-    }
-
-    interface ThemeShadow {
-      0: ThemeShadowItem;
-      1: ThemeShadowItem;
-      2: ThemeShadowItem;
-      3: ThemeShadowItem;
-      4: ThemeShadowItem;
-      5: ThemeShadowItem;
-    }
-
-    interface ThemeShadowItem {
-      x: string | number;
-      y: string | number;
-      blur: string | number;
-      scale: string | number;
     }
 
     interface ThemeLineHeight {
@@ -432,17 +534,25 @@ declare global {
       default: string | number;
     }
 
-    interface ThemeColor {
-      white: Color;
-      black: Color;
+    interface NamedColor {
+      foreground: Color;
+      background: Color;
+      text: Color;
       primary: Color;
       secondary: Color;
-      text: Color;
-      background: Color;
+      primaryText: Color;
+      secondaryText: Color;
+      border: Color;
       muted: Color;
+    }
+
+    interface ThemeColor extends NamedColor {
       shadow1: Color;
       shadow2: Color;
       shadow3: Color;
+      backdrop: Color;
+      active: NamedColor;
+      hover: NamedColor;
     }
 
     interface ThemeHue {
@@ -459,43 +569,6 @@ declare global {
       lime: Hue;
       yellow: Hue;
       orange: Hue;
-    }
-
-    /**
-     * Atoms which are translated to class names.
-     *
-     * The atoms can be added to
-     */
-    interface Atom {
-      shadow: AtomShadow;
-    }
-
-    interface AtomShadow {
-      bottom1: string[];
-      bottom2: string[];
-      bottom3: string[];
-      bottom4: string[];
-      bottom5: string[];
-      top1: string[];
-      top2: string[];
-      top3: string[];
-      top4: string[];
-      top5: string[];
-      center1: string[];
-      center2: string[];
-      center3: string[];
-      center4: string[];
-      center5: string[];
-      right1: string[];
-      right2: string[];
-      right3: string[];
-      right4: string[];
-      right5: string[];
-      left1: string[];
-      left2: string[];
-      left3: string[];
-      left4: string[];
-      left5: string[];
     }
   }
 }
